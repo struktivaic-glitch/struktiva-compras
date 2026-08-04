@@ -195,3 +195,25 @@ cd frontend && npm run dev # http://localhost:5173
     Residente confirmado sin acceso a `/usuarios` (redirigido) y sin ver el enlace en el menú;
     edición de proveedor (días de crédito) persistió correctamente; Residente confirmado con
     vista de Proveedores de solo lectura (sin alta, sin edición, sin columna de estatus).
+- **Bloque 14** (04/08/2026): Modo de prueba gratis en la nube, sin VPS. Se creó el repositorio
+  git del proyecto (`.gitignore` cuidando `.env`, `node_modules`, `uploads/` y los Excel de
+  referencia del negocio) y se subió a GitHub (`struktiva-compras`, privado). Base de datos real
+  en **Neon** (Postgres free tier) — se corrieron ahí las 7 migraciones y el seed; encontré y
+  corregí un bug real en el proceso: `seeds/001_demo.sql` todavía insertaba en
+  `presupuesto_partida_insumo`, tabla que la migración 007 ya había eliminado al pasar el control
+  de presupuesto a nivel Obra — corregido para insertar en `presupuesto_obra_insumo`. Redis
+  (Upstash) se evaluó y se descartó: revisé el código y ninguna funcionalidad construida hasta
+  ahora lo usa realmente (quedó en el stack original por diseño, pero el estado siempre vivió en
+  Postgres). Backend desplegado en **Render** (Web Service, free) conectado a Neon; frontend
+  desplegado en Render (Static Site, free) — único cambio de código necesario:
+  `frontend/src/lib/api.js` ahora lee `VITE_API_URL` en vez de asumir siempre `/api` relativo
+  (con fallback a `/api` para que el proxy de Vite en desarrollo local siga funcionando igual).
+  Un despliegue del frontend quedó con caché corrupta la primera vez (index.html apuntando a un
+  JS que ya no existía) — se resolvió con "Clear build cache & deploy" en Render. `CORS_ORIGIN`
+  del backend configurado a la URL del frontend. Probado de punta a punta en el navegador: login
+  real, saldos reales de la obra Horizontes cargando desde Neon, sin errores de consola.
+  🔗 **https://struktiva-frontend.onrender.com** — mismos usuarios demo, contraseña
+  `struktiva123`. Limitaciones del plan gratis: el backend se duerme tras 15 min de inactividad
+  (primera carga del día ~30-50s), y los archivos subidos no persisten de forma confiable
+  (sistema de archivos efímero en el plan free de Render) — aceptable para probar el flujo, no
+  para operar en serio; ahí es donde entra el VPS.

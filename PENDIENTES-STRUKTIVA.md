@@ -19,8 +19,18 @@ proyecto).
       el vectorial original (SVG/AI/EPS) — opcional, no urgente.
 
 ## Infraestructura / Hosting
-- [ ] **VPS con acceso root/SSH** (HostPapa es cPanel, no sirve para este stack). Elegir
-      proveedor (DigitalOcean, Hetzner, Vultr, etc.) y contratarlo, o darme acceso si ya
+- [x] **Modo de prueba en la nube, gratis, ya en vivo** — mientras decides el VPS, el sistema
+      está desplegado y funcionando en:
+      🔗 **https://struktiva-frontend.onrender.com**
+      Backend en Render (`struktiva-backend`), base de datos real en Neon (Postgres), código
+      respaldado en GitHub (`struktiva-compras`, privado). Usuarios demo de siempre, contraseña
+      `struktiva123`. Limitaciones a tener en cuenta mientras estén probando: el backend se
+      "duerme" tras 15 min sin uso (la primera entrada del día tarda ~30-50s en responder), y los
+      archivos subidos (fotos/PDFs de facturas) no persisten de forma confiable en este plan
+      gratuito — para eso sí se necesita el VPS o Object Storage real.
+- [ ] **VPS con acceso root/SSH** (HostPapa es cPanel, no sirve para este stack) — para cuando
+      decidan pasar de "modo de prueba" a operar en serio. Elegir proveedor (recomendé Vultr por
+      su región en Ciudad de México — ver `NOTAS.md`) y contratarlo, o darme acceso si ya
       tienes uno pensado.
 - [ ] **Acceso al panel de DNS de HostPapa** (para crear el registro A/CNAME del subdominio,
       ej. `compras.struktiva.com.mx`, apuntando al VPS).
