@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+
+# Build output
+frontend/dist/
+frontend/dev-dist/
+
+# Uploaded files (local disk stand-in for object storage — not meant to be versioned)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+
+# Archivos de referencia/negocio (no son parte del código de la aplicación)
+Control_Requisiciones_Neodata.xlsx
+Neodata_ERP_Replica_Full.xlsm
+Neodata_ERP_Replica_Full.xlsx
+Sistema_Requisiciones_Dinamico.xlsx
+INSTRUCCIONES.docx

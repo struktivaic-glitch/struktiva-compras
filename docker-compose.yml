@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: struktiva_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: struktiva
+      POSTGRES_PASSWORD: struktiva_dev_password
+      POSTGRES_DB: struktiva_compras
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U struktiva -d struktiva_compras"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: struktiva_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
