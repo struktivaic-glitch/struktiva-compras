@@ -25,11 +25,11 @@ INSERT INTO partidas (frente_id, clave, nombre, tolerancia_recepcion_pct) VALUES
   ((SELECT id FROM frentes WHERE nombre = 'Drenajes'), 'DRN-01', 'Tubería sanitaria PVC', NULL),
   ((SELECT id FROM frentes WHERE nombre = 'Drenajes'), 'DRN-02', 'Rejillas y coladeras pluviales', NULL);
 
-INSERT INTO presupuesto_partida_insumo (partida_id, insumo_id, cantidad_presupuestada, costo_unitario, moneda) VALUES
-  ((SELECT id FROM partidas WHERE clave = 'DRN-01'), (SELECT id FROM insumos WHERE clave = 'TUB-006'), 1200, 405.00, 'MXN'),
-  ((SELECT id FROM partidas WHERE clave = 'DRN-01'), (SELECT id FROM insumos WHERE clave = 'CEM-050'), 850, 245.00, 'MXN'),
-  ((SELECT id FROM partidas WHERE clave = 'DRN-01'), (SELECT id FROM insumos WHERE clave = 'GRA-034'), 180, 620.00, 'MXN'),
-  ((SELECT id FROM partidas WHERE clave = 'DRN-02'), (SELECT id FROM insumos WHERE clave = 'REJ-018'), 120, 1187.75, 'MXN');
+INSERT INTO presupuesto_obra_insumo (obra_id, insumo_id, cantidad_presupuestada, costo_unitario, moneda) VALUES
+  ((SELECT id FROM obras WHERE nombre = 'Horizontes'), (SELECT id FROM insumos WHERE clave = 'TUB-006'), 1200, 405.00, 'MXN'),
+  ((SELECT id FROM obras WHERE nombre = 'Horizontes'), (SELECT id FROM insumos WHERE clave = 'CEM-050'), 850, 245.00, 'MXN'),
+  ((SELECT id FROM obras WHERE nombre = 'Horizontes'), (SELECT id FROM insumos WHERE clave = 'GRA-034'), 180, 620.00, 'MXN'),
+  ((SELECT id FROM obras WHERE nombre = 'Horizontes'), (SELECT id FROM insumos WHERE clave = 'REJ-018'), 120, 1187.75, 'MXN');
 
 -- Usuarios demo — password para todos: "struktiva123" (bcrypt hash, cambiar en producción)
 INSERT INTO usuarios (nombre, email, password_hash, rol_id) VALUES
