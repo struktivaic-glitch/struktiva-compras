@@ -3,6 +3,27 @@ import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
 import { registrarFirma } from '../../lib/firma.js';
 import { notificarPorRol } from '../../lib/notificaciones.js';
+import { env } from '../../config/env.js';
+
+// Vista previa en texto de la requisición para el mensaje de Telegram — no es un PDF/impresión
+// real (eso pediría Puppeteer, que evitamos a propósito en este proyecto), pero da el detalle
+// completo sin tener que abrir la app primero.
+function formatoRequisicionTelegram(req, encabezado) {
+  const lineas = [encabezado, ''];
+  lineas.push(`Obra: ${req.obra_nombre} / ${req.frente_nombre} / ${req.partida_nombre}`);
+  lineas.push(`Solicitante: ${req.solicitante_nombre}`);
+  const hayExcedente = req.detalle.some((d) => d.excede_presupuesto);
+  if (hayExcedente) lineas.push('⚠️ Incluye insumos que exceden el saldo disponible');
+  lineas.push('', 'Insumos:');
+  for (const d of req.detalle) {
+    const cantidad = Number(d.cantidad_requerida).toLocaleString('es-MX');
+    const marca = d.excede_presupuesto ? ' ⚠️ excede' : '';
+    lineas.push(`• ${d.descripcion} — ${cantidad} ${d.unidad}${marca}`);
+    if (d.excede_presupuesto && d.justificacion) lineas.push(`   Justificación: ${d.justificacion}`);
+  }
+  lineas.push('', `Ver y autorizar: ${env.corsOrigin}/requisiciones`);
+  return lineas.join('\n');
+}
 
 async function cargarRequisicionCompleta(client, id) {
   const { rows: cab } = await client.query(
@@ -172,10 +193,13 @@ export default async function requisicionesRoutes(app) {
         tabla: 'requisiciones', registroId: id, usuarioId: request.user.sub, accion: 'enviar_autorizacion',
         antes: { estatus: 'borrador' }, despues: { estatus: 'pendiente_autorizacion' },
       });
+
+      const completa = await cargarRequisicionCompleta(client, id);
       await notificarPorRol(client, {
         roles: ['superintendente', 'direccion'], categoria: 'requisicion', entidadTipo: 'requisicion', entidadId: Number(id),
         titulo: `Requisición ${req.folio} pendiente de autorizar`,
         mensaje: 'Requiere tu autorización para continuar.',
+        textoTelegram: formatoRequisicionTelegram(completa, `📋 ${req.folio} pendiente de autorizar`),
         excluirUsuarioId: request.user.sub,
       });
       return { ok: true };
@@ -224,10 +248,12 @@ export default async function requisicionesRoutes(app) {
         // avisa que el otro ya hizo el ajuste, para que ambos queden enterados.
         if (tieneExcedente) {
           const otroRol = request.user.rol === 'direccion' ? 'superintendente' : 'direccion';
+          const completa = await cargarRequisicionCompleta(client, id);
           await notificarPorRol(client, {
             roles: [otroRol], categoria: 'excedente', entidadTipo: 'requisicion', entidadId: Number(id),
             titulo: `Excedente autorizado en requisición ${req.folio}`,
             mensaje: `${request.user.nombre} autorizó el excedente de presupuesto de esta requisición.`,
+            textoTelegram: formatoRequisicionTelegram(completa, `✅ ${request.user.nombre} autorizó el excedente de ${req.folio}`),
             excluirUsuarioId: request.user.sub,
           });
         }
@@ -266,6 +292,7 @@ export default async function requisicionesRoutes(app) {
         roles: ['direccion', 'auditor'], categoria: 'cancelacion', entidadTipo: 'requisicion', entidadId: Number(id),
         titulo: `Requisición ${req.folio} cancelada`,
         mensaje: `${request.user.nombre} canceló esta requisición (estaba en estatus "${req.estatus}").`,
+        textoTelegram: `❌ Requisición ${req.folio} cancelada\n\n${request.user.nombre} la canceló (estaba en estatus "${req.estatus}").\n\nVer: ${env.corsOrigin}/requisiciones`,
         excluirUsuarioId: request.user.sub,
       });
       return { ok: true };

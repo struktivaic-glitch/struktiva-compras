@@ -11,6 +11,7 @@ export function telegramConfigurado() {
 
 export async function enviarTelegram(chatId, texto) {
   if (!API_BASE || !chatId) return;
+  if (process.env.TELEGRAM_DEBUG_LOG === '1') console.log('--- TELEGRAM DEBUG ---\n' + texto + '\n----------------------');
   try {
     const res = await fetch(`${API_BASE}/sendMessage`, {
       method: 'POST',
