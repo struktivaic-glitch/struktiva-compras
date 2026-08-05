@@ -81,6 +81,9 @@ export default async function catalogoRoutes(app) {
   app.get('/api/catalogo/obras/:obraId/insumos', async (request, reply) => {
     const { obraId } = request.params;
     const q = (request.query.q ?? '').trim();
+    // El buscador de autocompletado pide pocos (rápido, mientras escribes); el catálogo completo
+    // (modal "Ver catálogo") pide todos con ?todos=1, agrupados por familia del lado del cliente.
+    const limite = request.query.todos === '1' ? 500 : 25;
 
     const { rows } = await pool.query(
       `SELECT i.id, i.clave, i.descripcion, i.unidad, fi.nombre AS familia_nombre,
@@ -91,9 +94,9 @@ export default async function catalogoRoutes(app) {
        JOIN vw_saldo_obra_insumo s ON s.obra_id = poi.obra_id AND s.insumo_id = poi.insumo_id
        WHERE poi.obra_id = $1
          AND ($2 = '' OR i.descripcion ILIKE '%' || $2 || '%' OR i.clave ILIKE '%' || $2 || '%')
-       ORDER BY i.descripcion
-       LIMIT 25`,
-      [obraId, q]
+       ORDER BY fi.nombre NULLS LAST, i.descripcion
+       LIMIT $3`,
+      [obraId, q, limite]
     );
 
     return rows;

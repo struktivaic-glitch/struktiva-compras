@@ -51,26 +51,79 @@
     </div>
 
     <div v-if="obraId" class="bg-white border border-slate-200 rounded-xl p-4 mb-5">
-      <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Agregar insumo (autocompletado)</label>
-      <div class="relative">
-        <input
-          v-model="busqueda"
-          type="text"
-          placeholder="Buscar por clave o descripción…"
-          class="w-full border border-slate-300 rounded-lg px-3 min-h-[44px]"
-          @input="buscarInsumos"
-        />
-        <ul v-if="sugerencias.length" class="absolute z-10 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 w-full max-h-64 overflow-y-auto">
-          <li
-            v-for="s in sugerencias"
-            :key="s.id"
-            class="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer flex justify-between"
-            @click="agregarInsumo(s)"
-          >
-            <span>{{ s.clave }} · {{ s.descripcion }} ({{ s.unidad }})</span>
-            <span class="tabular-nums text-slate-400">saldo: {{ Number(s.saldo_disponible).toLocaleString('es-MX') }}</span>
-          </li>
-        </ul>
+      <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Agregar insumo</label>
+      <div class="flex gap-2">
+        <div class="relative flex-1">
+          <input
+            v-model="busqueda"
+            type="text"
+            placeholder="Buscar por clave o descripción…"
+            class="w-full border border-slate-300 rounded-lg px-3 min-h-[44px]"
+            @input="buscarInsumos"
+          />
+          <ul v-if="sugerencias.length" class="absolute z-10 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 w-full max-h-64 overflow-y-auto">
+            <li
+              v-for="s in sugerencias"
+              :key="s.id"
+              class="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer flex justify-between"
+              @click="agregarInsumo(s)"
+            >
+              <span>{{ s.clave }} · {{ s.descripcion }} ({{ s.unidad }})</span>
+              <span class="tabular-nums text-slate-400">saldo: {{ Number(s.saldo_disponible).toLocaleString('es-MX') }}</span>
+            </li>
+          </ul>
+        </div>
+        <button
+          type="button"
+          class="min-h-[44px] flex-none border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm whitespace-nowrap"
+          @click="abrirCatalogo"
+        >
+          Ver catálogo completo
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal: catálogo completo de insumos de la obra, agrupado por familia -->
+    <div v-if="catalogoAbierto" class="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-3" @click.self="catalogoAbierto = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div class="p-4 border-b border-slate-200 flex-none">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-display text-base">Catálogo de insumos — {{ obraNombre }}</h3>
+            <button class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="catalogoAbierto = false">✕</button>
+          </div>
+          <input
+            v-model="catalogoFiltro"
+            type="text"
+            placeholder="Filtrar por clave, descripción o familia…"
+            class="w-full border border-slate-300 rounded-lg px-3 min-h-[42px] text-sm"
+          />
+        </div>
+        <div class="overflow-y-auto p-4 flex-1">
+          <p v-if="catalogoCargando" class="text-sm text-slate-400 text-center py-8">Cargando catálogo…</p>
+          <template v-else-if="familiasFiltradas.length">
+            <div v-for="fam in familiasFiltradas" :key="fam.nombre" class="mb-5 last:mb-0">
+              <h4 class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">{{ fam.nombre }}</h4>
+              <div class="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                <button
+                  v-for="s in fam.insumos"
+                  :key="s.id"
+                  type="button"
+                  class="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 flex items-center justify-between gap-3"
+                  @click="agregarInsumo(s); catalogoFiltro = ''"
+                >
+                  <span class="min-w-0">
+                    <span class="font-semibold">{{ s.clave }}</span> · {{ s.descripcion }}
+                    <span class="text-slate-400"> ({{ s.unidad }})</span>
+                  </span>
+                  <span class="tabular-nums text-slate-400 flex-none text-xs">saldo: {{ Number(s.saldo_disponible).toLocaleString('es-MX') }}</span>
+                </button>
+              </div>
+            </div>
+          </template>
+          <p v-else class="text-sm text-slate-400 text-center py-8">
+            {{ catalogoInsumos.length ? 'No hay insumos que coincidan con el filtro.' : 'Ya agregaste todos los insumos presupuestados de esta obra.' }}
+          </p>
+        </div>
       </div>
     </div>
 
@@ -185,6 +238,31 @@ const guardadoOffline = ref(false);
 const etapas = computed(() => obras.value.find((o) => o.id === obraId.value)?.etapas ?? []);
 const frentes = computed(() => etapas.value.find((e) => e.id === etapaId.value)?.frentes ?? []);
 const partidas = computed(() => frentes.value.find((f) => f.id === frenteId.value)?.partidas ?? []);
+const obraNombre = computed(() => obras.value.find((o) => o.id === obraId.value)?.nombre ?? '');
+
+const catalogoAbierto = ref(false);
+const catalogoCargando = ref(false);
+const catalogoInsumos = ref([]);
+const catalogoFiltro = ref('');
+
+const familiasFiltradas = computed(() => {
+  const filtro = catalogoFiltro.value.trim().toLowerCase();
+  const disponibles = catalogoInsumos.value.filter((s) => !items.value.some((i) => i.insumoId === s.id));
+  const coincide = (s) =>
+    !filtro ||
+    s.clave.toLowerCase().includes(filtro) ||
+    s.descripcion.toLowerCase().includes(filtro) ||
+    (s.familia_nombre ?? '').toLowerCase().includes(filtro);
+
+  const grupos = new Map();
+  for (const s of disponibles) {
+    if (!coincide(s)) continue;
+    const nombre = s.familia_nombre ?? 'Sin familia';
+    if (!grupos.has(nombre)) grupos.set(nombre, []);
+    grupos.get(nombre).push(s);
+  }
+  return [...grupos.entries()].map(([nombre, insumos]) => ({ nombre, insumos }));
+});
 
 function excede(item) {
   return Number(item.cantidadRequerida) > Number(item.saldoDisponible);
@@ -196,7 +274,7 @@ async function cargarArbol() {
   obraId.value = data[0]?.id ?? null;
 }
 
-watch(obraId, () => { etapaId.value = etapas.value[0]?.id ?? null; items.value = []; });
+watch(obraId, () => { etapaId.value = etapas.value[0]?.id ?? null; items.value = []; catalogoInsumos.value = []; });
 watch(etapaId, () => { frenteId.value = frentes.value[0]?.id ?? null; });
 watch(frenteId, () => { partidaId.value = partidas.value[0]?.id ?? null; });
 
@@ -208,6 +286,19 @@ function buscarInsumos() {
     const { data } = await api.get(`/catalogo/obras/${obraId.value}/insumos`, { params: { q: busqueda.value } });
     sugerencias.value = data.filter((s) => !items.value.some((i) => i.insumoId === s.id));
   }, 200);
+}
+
+async function abrirCatalogo() {
+  catalogoAbierto.value = true;
+  catalogoFiltro.value = '';
+  if (catalogoInsumos.value.length) return; // ya cargado en esta sesión de captura
+  catalogoCargando.value = true;
+  try {
+    const { data } = await api.get(`/catalogo/obras/${obraId.value}/insumos`, { params: { todos: '1' } });
+    catalogoInsumos.value = data;
+  } finally {
+    catalogoCargando.value = false;
+  }
 }
 
 function agregarInsumo(s) {
