@@ -217,3 +217,30 @@ cd frontend && npm run dev # http://localhost:5173
   (primera carga del día ~30-50s), y los archivos subidos no persisten de forma confiable
   (sistema de archivos efímero en el plan free de Render) — aceptable para probar el flujo, no
   para operar en serio; ahí es donde entra el VPS.
+- **Bloque 15** (04/08/2026): Sistema de notificaciones — campanita en el topbar + página
+  `/notificaciones` con pestañas por categoría, a partir de la primera duda real del usuario
+  probando el sistema ("¿cómo se notifica a alguien que tiene que autorizar algo?" — hasta este
+  bloque, nada avisaba, había que entrar a revisar manualmente). Se evaluó Telegram vs. WhatsApp
+  para notificar por celular — el usuario eligió WhatsApp (su equipo ya lo usa a diario) vía la
+  API oficial de Meta (Cloud API, con número de prueba gratis para hasta 5 destinatarios sin
+  verificación de negocio) — queda pendiente que el usuario complete el registro en
+  developers.facebook.com (Bloque 16). Mientras tanto, se construyó la campanita en la app:
+  - Nueva tabla `notificaciones` (categoría/entidad genérica) y helper `notificarPorRol()`
+    (`backend/src/lib/notificaciones.js`) para no repetir lógica de "a quién le toca enterarse".
+  - **Requisiciones**: al enviar a autorizar, avisa a Superintendente + Dirección.
+  - **Excedente**: categoría separada por decisión explícita del usuario — ambos roles
+    (Superintendente y Dirección) pueden seguir autorizando normalmente, pero cuando cualquiera
+    de los dos autoriza una requisición con renglones excedidos, se le avisa automáticamente al
+    otro rol de que se hizo ese ajuste (aviso cruzado, no doble autorización).
+  - **Cancelaciones**: aviso informativo a Dirección + Auditor (decisión del usuario: no
+    bloquear al que cancela, solo mantenerlos enterados).
+  - **Órdenes de compra** y **Cambio de precio**: categorías preparadas en la UI (pestaña propia,
+    estado vacío) pero sin candado real todavía — el usuario pidió dejar OC como está por ahora
+    ("necesito analizar cómo sería lo mejor operativamente"), y Cambio de precio quedó definido
+    para el Bloque 16 (debe activarse en dos momentos: cotización vs. presupuestado, y factura
+    vs. OC en el three-way matching) — falta definir el umbral de % y confirmar el autorizador.
+  - Probado de punta a punta con datos reales (contra Neon, limpiando después la data de prueba
+    para no ensuciar el ambiente que el usuario está probando): Residente crea requisición con
+    excedente → Superintendente la ve en la campanita → autoriza con PIN → Dirección recibe el
+    aviso cruzado de excedente → se cancela → Auditor recibe el aviso de cancelación. Los tres
+    flujos verificados también ya desplegados en Render (no solo en local).

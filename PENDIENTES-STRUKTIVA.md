@@ -75,6 +75,25 @@ proyecto).
       de la Explosión de Insumos (en vez de una exportación manual), dime y vemos cómo conectar
       a ella de forma segura (idealmente un export/backup de solo lectura, no la base viva).
 
+## Notificaciones
+- [x] **Campanita de notificaciones en la app** — construida y probada (ver Bloque 15 en
+      `NOTAS.md`): Requisiciones pendientes, Excedente (con aviso cruzado entre Superintendente y
+      Dirección) y Cancelaciones ya avisan solas. Órdenes de Compra y Cambio de precio quedan
+      pendientes de un candado real (ver siguiente punto).
+- [ ] **Avisos por WhatsApp** — decidiste que sí, vía la API oficial de Meta (gratis para tu
+      equipo con el número de prueba). Para que yo pueda conectarlo, necesito que:
+      1. Entres a [developers.facebook.com](https://developers.facebook.com) y crees una App tipo
+         "Business" con el producto WhatsApp.
+      2. Agregues los números de tu equipo como destinatarios de prueba (cada uno confirma con un
+         código que le llega por WhatsApp).
+      3. Me compartas el **token de acceso**, el **Phone Number ID**, y la lista de números ya
+         verificados.
+- [ ] **Reglas de negocio pendientes de definir** para el candado de "Cambio de precio" (Bloque
+      16): ¿qué % de variación entre el precio cotizado/facturado y el presupuestado debe
+      detener el proceso?, y ¿quién lo autoriza (propongo Dirección, confírmalo o cámbialo)?
+- [ ] **Órdenes de Compra**: dijiste que lo vas a analizar — cuando decidas si Compras las puede
+      confirmar solo o necesitan autorización de Dirección, lo construimos.
+
 ---
-*Última actualización: Bloque 13 (módulo de Usuarios y edición de Proveedores, con jerarquía de
-permisos) — 03/08/2026. Detalle completo de cada bloque en `NOTAS.md`.*
+*Última actualización: Bloque 15 (sistema de notificaciones — campanita + página por categorías)
+— 04/08/2026. Detalle completo de cada bloque en `NOTAS.md`.*
