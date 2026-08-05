@@ -80,19 +80,20 @@ proyecto).
       `NOTAS.md`): Requisiciones pendientes, Excedente (con aviso cruzado entre Superintendente y
       Dirección) y Cancelaciones ya avisan solas. Órdenes de Compra y Cambio de precio quedan
       pendientes de un candado real (ver siguiente punto).
-- [ ] **Avisos por WhatsApp — en pausa.** Intentamos conectarlo vía la API oficial de Meta
-      (gratis) pero tu cuenta de Facebook tiene "acceso restringido a publicidad" que bloquea
-      crear el portfolio comercial que ese camino necesita — confirmado en
-      business.facebook.com/business-support-home que no hay ninguna violación que apelar (es
-      solo falta de "confianza" acumulada de la cuenta, sin fecha ni acción clara para
-      resolverlo). Decidiste pausar esto por ahora; la campanita dentro de la app sigue
-      funcionando sola mientras tanto. Para retomarlo cuando quieras, las opciones que quedaron
-      sobre la mesa:
-      1. Probar el mismo proceso con el Facebook personal de otra persona del equipo (más
-         antiguo/activo, sin la misma restricción).
-      2. Usar **Twilio** como intermediario — ellos resuelven la relación con Meta usando la
-         verificación real del negocio (RFC, acta constitutiva) en vez de depender de la cuenta
-         personal de Facebook. Tiene un costo pequeño por mensaje.
+- [x] ~~Avisos por WhatsApp~~ — en pausa indefinida: tu cuenta de Facebook tiene "acceso
+      restringido a publicidad" que bloquea crear el portfolio comercial que ese camino necesita
+      (confirmado en business.facebook.com/business-support-home que no hay ninguna violación que
+      apelar — es solo falta de "confianza" acumulada de la cuenta). Si algún día lo quieres
+      retomar: prueba con el Facebook personal de otra persona del equipo, o usa Twilio como
+      intermediario (evita depender de tu cuenta personal, tiene un costo pequeño por mensaje).
+- [ ] **Avisos por Telegram — construido, falta solo tu parte.** Decidiste ir por aquí en vez de
+      WhatsApp (sin los problemas de verificación de Meta). Para activarlo:
+      1. En Telegram, busca **@BotFather**, mándale `/newbot`, ponle nombre y usuario (debe
+         terminar en "bot").
+      2. Te da un **token** — pásamelo para configurarlo en el servidor.
+      3. Cuando esté activo, cada persona de tu equipo entra a su **Perfil** dentro del sistema y
+         da clic en "Vincular Telegram" — un proceso de un clic, sin que yo tenga que hacer nada
+         manual por cada usuario.
 - [ ] **Reglas de negocio pendientes de definir** para el candado de "Cambio de precio" (Bloque
       16): ¿qué % de variación entre el precio cotizado/facturado y el presupuestado debe
       detener el proceso?, y ¿quién lo autoriza (propongo Dirección, confírmalo o cámbialo)?
