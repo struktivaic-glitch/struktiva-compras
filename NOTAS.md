@@ -297,6 +297,18 @@ cambio de estructura de base de datos.
   documento (verificado byte a byte que lo que se sube es exactamente lo que se descarga),
   acceso sin sesión bloqueado (401), rol sin permiso (Auditor) puede consultar pero no dar de
   alta (403) — datos de prueba eliminados después.
+- **Bloque HR-B** (05/08/2026): Asistencia / checador. Segundo bloque del módulo de RH, mismas
+  reglas del Bloque HR-A (control interno, sin nómina fiscal). Nueva tabla `asistencias`
+  (trabajador + fecha, único por día) con hora de entrada/salida y GPS best-effort en cada una
+  (mismo patrón de `obtenerGps()` que ya usan las Firmas — no bloquea si el navegador niega el
+  permiso). Nueva pantalla `/asistencia` con dos vistas: **Checador** (personal activo del día,
+  filtrable por obra, con botones "Marcar entrada"/"Marcar salida") e **Histórico** (rango de
+  fechas, filtrable por obra, con horas trabajadas calculadas e impresión). El backend valida
+  que no se pueda marcar entrada dos veces el mismo día, ni salida sin entrada previa, ni salida
+  dos veces — probado explícitamente los tres casos de error. Permisos: Residente/
+  Superintendente/Dirección pueden marcar; el resto de roles solo consulta. Probado de punta a
+  punta contra Neon (marcar entrada con GPS, marcar salida con GPS, ambos rechazos de duplicado,
+  aparece correcto en checador e histórico) y limpiado después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo
