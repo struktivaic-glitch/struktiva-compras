@@ -19,9 +19,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.print-only {
+  display: none;
+}
+
 @media print {
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: inline;
   }
   body {
     background: #fff;

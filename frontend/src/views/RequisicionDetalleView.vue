@@ -2,7 +2,7 @@
   <AppShell>
     <div v-if="!req" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
-      <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
           <h2 class="font-display text-lg">
             {{ req.folio }}
@@ -16,15 +16,22 @@
             <template v-if="req.autoriza_nombre"> · Autorizó: {{ req.autoriza_nombre }} ({{ formatoFecha(req.fecha_autorizacion) }})</template>
           </p>
         </div>
-        <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full flex-none" :class="estatusClase(req.estatus)">
-          {{ estatusTexto(req.estatus) }}
-        </span>
+        <div class="flex items-center gap-2 flex-none">
+          <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="estatusClase(req.estatus)">
+            {{ estatusTexto(req.estatus) }}
+          </span>
+          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        </div>
       </div>
 
-      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4">{{ error }}</p>
-      <p v-if="mensaje" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 my-4">{{ mensaje }}</p>
+      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4 no-print">{{ error }}</p>
+      <p v-if="mensaje" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 my-4 no-print">{{ mensaje }}</p>
 
-      <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl my-5">
+      <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 my-5">
+        <ReportePrintHeader
+          :titulo="`Requisición ${req.folio}`"
+          :subtitulo="`${req.obra_nombre} / ${req.frente_nombre} / ${req.partida_clave} — ${req.partida_nombre} · Solicitante: ${req.solicitante_nombre} · Estatus: ${estatusTexto(req.estatus)}`"
+        />
         <table class="w-full text-sm tabular-nums">
           <thead>
             <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
@@ -55,7 +62,7 @@
         </table>
       </div>
 
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 no-print">
         <RouterLink :to="`/expediente/${req.id}`" class="min-h-[44px] flex items-center border border-slate-300 text-slate-600 font-bold rounded-lg px-5 text-sm">
           Ver expediente completo
         </RouterLink>
@@ -84,6 +91,7 @@
 
       <FirmaModal
         v-if="mostrarFirma"
+        class="no-print"
         :etiqueta="`Autorizando ${req.folio}`"
         ref="firmaModalRef"
         @firmado="autorizarConFirma"
@@ -98,6 +106,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import FirmaModal from '../components/FirmaModal.vue';
+import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 

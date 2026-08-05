@@ -2,7 +2,7 @@
   <AppShell>
     <div v-if="!oc" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
-      <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
           <h2 class="font-display text-lg">{{ oc.folio }}</h2>
           <p class="text-xs text-slate-500">
@@ -10,14 +10,21 @@
             Requisiciones: {{ oc.requisiciones.map(r => r.folio).join(', ') }}
           </p>
         </div>
-        <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="oc.estatus === 'confirmada' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
-          {{ oc.estatus === 'confirmada' ? 'Confirmada' : 'Borrador' }}
-        </span>
+        <div class="flex items-center gap-2 flex-none">
+          <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="oc.estatus === 'confirmada' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
+            {{ oc.estatus === 'confirmada' ? 'Confirmada' : 'Borrador' }}
+          </span>
+          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        </div>
       </div>
 
-      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4">{{ error }}</p>
+      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4 no-print">{{ error }}</p>
 
-      <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl my-5">
+      <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 my-5">
+        <ReportePrintHeader
+          :titulo="`Orden de Compra ${oc.folio}`"
+          :subtitulo="`${oc.proveedor_nombre} (${oc.proveedor_rfc || 'sin RFC'}) · Cotización ${oc.cotizacion_folio} · Requisiciones: ${oc.requisiciones.map(r => r.folio).join(', ')} · Estatus: ${oc.estatus === 'confirmada' ? 'Confirmada' : 'Borrador'}`"
+        />
         <table class="w-full text-sm tabular-nums">
           <thead>
             <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
@@ -47,7 +54,7 @@
         </table>
       </div>
 
-      <button v-if="oc.estatus === 'borrador' && puedeComprar" class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm" :disabled="confirmando" @click="confirmar">
+      <button v-if="oc.estatus === 'borrador' && puedeComprar" class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print" :disabled="confirmando" @click="confirmar">
         {{ confirmando ? 'Confirmando…' : 'Confirmar Orden de Compra' }}
       </button>
     </template>
@@ -58,6 +65,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 

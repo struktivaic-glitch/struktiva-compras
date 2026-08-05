@@ -2,23 +2,29 @@
   <AppShell>
     <div v-if="!proceso" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
-      <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
           <h2 class="font-display text-lg">{{ proceso.folio }}</h2>
           <p class="text-xs text-slate-500">
             {{ proceso.obra_nombre }} · Requisiciones: {{ proceso.requisiciones.map(r => r.folio).join(', ') }}
           </p>
         </div>
-        <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="proceso.estatus === 'cerrado' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
-          {{ proceso.estatus === 'cerrado' ? 'Cerrado' : 'En cotización' }}
-        </span>
+        <div class="flex items-center gap-2 flex-none">
+          <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="proceso.estatus === 'cerrado' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
+            {{ proceso.estatus === 'cerrado' ? 'Cerrado' : 'En cotización' }}
+          </span>
+          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        </div>
       </div>
 
-      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4">{{ error }}</p>
-      <p v-if="aviso" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 my-4">{{ aviso }}</p>
+      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4 no-print">{{ error }}</p>
+      <p v-if="aviso" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 my-4 no-print">{{ aviso }}</p>
 
-      <h3 class="text-sm font-display mt-6 mb-2">Cuadro comparativo</h3>
-      <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl mb-6">
+      <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 mb-6">
+        <ReportePrintHeader
+          :titulo="`Cuadro comparativo ${proceso.folio}`"
+          :subtitulo="`${proceso.obra_nombre} · Requisiciones: ${proceso.requisiciones.map(r => r.folio).join(', ')} · Estatus: ${proceso.estatus === 'cerrado' ? 'Cerrado' : 'En cotización'}`"
+        />
         <table class="w-full text-sm tabular-nums">
           <thead>
             <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
@@ -44,7 +50,7 @@
                 <select
                   v-if="proceso.estatus !== 'cerrado' && puedeComprar"
                   :value="ganadorPorInsumo[ins.id] || ''"
-                  class="border border-slate-300 rounded px-2 py-1 text-xs"
+                  class="border border-slate-300 rounded px-2 py-1 text-xs no-print"
                   @change="marcarGanador(ins.id, $event.target.value)"
                 >
                   <option value="" disabled>Elegir…</option>
@@ -53,6 +59,7 @@
                   </option>
                 </select>
                 <span v-else class="text-success text-xs font-bold">{{ nombreGanador(ins.id) || (proceso.estatus === 'cerrado' ? '—' : 'Pendiente de elegir') }}</span>
+                <span v-if="proceso.estatus !== 'cerrado' && puedeComprar" class="print-only text-success text-xs font-bold">{{ nombreGanador(ins.id) || 'Pendiente de elegir' }}</span>
               </td>
             </tr>
           </tbody>
@@ -60,8 +67,8 @@
       </div>
 
       <template v-if="proceso.estatus !== 'cerrado' && puedeComprar">
-        <h3 class="text-sm font-display mb-2">Agregar cotización de proveedor</h3>
-        <form class="bg-white border border-slate-200 rounded-xl p-4 mb-6" @submit.prevent="agregarProveedor">
+        <h3 class="text-sm font-display mb-2 no-print">Agregar cotización de proveedor</h3>
+        <form class="bg-white border border-slate-200 rounded-xl p-4 mb-6 no-print" @submit.prevent="agregarProveedor">
           <div class="grid sm:grid-cols-3 gap-3 mb-3">
             <div>
               <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Proveedor</label>
@@ -90,27 +97,27 @@
         </form>
 
         <button
-          class="min-h-[48px] bg-success text-white font-bold rounded-lg px-5 text-sm disabled:opacity-50"
+          class="min-h-[48px] bg-success text-white font-bold rounded-lg px-5 text-sm disabled:opacity-50 no-print"
           :disabled="!todosConGanador || cerrando"
           @click="cerrar"
         >
           {{ cerrando ? 'Cerrando…' : 'Cerrar cuadro comparativo' }}
         </button>
-        <span v-if="!todosConGanador" class="text-xs text-slate-400 ml-3">Elige proveedor ganador para todos los insumos antes de cerrar.</span>
+        <span v-if="!todosConGanador" class="text-xs text-slate-400 ml-3 no-print">Elige proveedor ganador para todos los insumos antes de cerrar.</span>
       </template>
 
       <template v-else-if="proceso.estatus === 'cerrado' && puedeComprar">
-        <button class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm" :disabled="generando" @click="generarOc">
+        <button class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print" :disabled="generando" @click="generarOc">
           {{ generando ? 'Generando…' : 'Generar Orden(es) de Compra' }}
         </button>
-        <div v-if="ocsGeneradas.length" class="mt-4 flex flex-col gap-2">
+        <div v-if="ocsGeneradas.length" class="mt-4 flex flex-col gap-2 no-print">
           <RouterLink v-for="oc in ocsGeneradas" :key="oc.id" :to="`/ordenes-compra/${oc.id}`" class="text-sm font-semibold text-primary underline">
             {{ oc.folio }} — {{ oc.proveedor_nombre }} generada ✓
           </RouterLink>
         </div>
       </template>
 
-      <p v-else class="text-xs text-slate-400">Solo Compras/Dirección pueden agregar cotizaciones, cerrar el cuadro o generar la Orden de Compra.</p>
+      <p v-else class="text-xs text-slate-400 no-print">Solo Compras/Dirección pueden agregar cotizaciones, cerrar el cuadro o generar la Orden de Compra.</p>
     </template>
   </AppShell>
 </template>
@@ -119,6 +126,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
