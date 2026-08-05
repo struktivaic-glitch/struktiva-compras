@@ -235,13 +235,31 @@
         <button type="button" class="min-h-[42px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm" :disabled="!nuevoPersonal.trabajadorId || !nuevoPersonal.monto" @click="agregarPersonal">
           + Agregar
         </button>
-        <RouterLink to="/trabajadores" class="text-xs text-slate-400 underline ml-auto">¿No está en la lista? Dar de alta</RouterLink>
+        <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
       </div>
 
       <p class="text-xs font-semibold" :class="personalCuadra ? 'text-success' : 'text-danger'">
         Asignado: {{ mxn(sumaPersonal) }} de {{ mxn(montoManoDeObra) }}
         <span v-if="!personalCuadra && personal.length"> — no cuadra, faltan {{ mxn(montoManoDeObra - sumaPersonal) }}</span>
       </p>
+    </div>
+
+    <!-- Alta rápida de trabajador, sin salir de la requisición en progreso -->
+    <div v-if="mostrarAltaTrabajador" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3" @click.self="mostrarAltaTrabajador = false">
+      <form class="bg-white rounded-xl shadow-lg w-full max-w-sm p-4" @submit.prevent="darDeAltaTrabajador">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-display text-base">Dar de alta trabajador</h3>
+          <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="mostrarAltaTrabajador = false">✕</button>
+        </div>
+        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Nombre</label>
+        <input v-model="altaTrabajador.nombre" required class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-3" />
+        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Oficio (opcional)</label>
+        <input v-model="altaTrabajador.oficio" placeholder="Ej. Albañil, Peón, Fierrero…" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-3" />
+        <p v-if="errorAltaTrabajador" class="text-xs text-danger mb-2">{{ errorAltaTrabajador }}</p>
+        <button type="submit" class="min-h-[44px] bg-primary text-white font-bold rounded-lg px-5 text-sm w-full" :disabled="guardandoTrabajador">
+          {{ guardandoTrabajador ? 'Guardando…' : '+ Agregar y seleccionar' }}
+        </button>
+      </form>
     </div>
 
     <div class="flex gap-2.5">
@@ -368,6 +386,27 @@ function quitarInsumo(item) {
 const trabajadores = ref([]);
 const personal = ref([]);
 const nuevoPersonal = reactive({ trabajadorId: null, monto: null });
+const mostrarAltaTrabajador = ref(false);
+const altaTrabajador = reactive({ nombre: '', oficio: '' });
+const errorAltaTrabajador = ref('');
+const guardandoTrabajador = ref(false);
+
+async function darDeAltaTrabajador() {
+  errorAltaTrabajador.value = '';
+  guardandoTrabajador.value = true;
+  try {
+    const { data } = await api.post('/trabajadores', altaTrabajador);
+    trabajadores.value.push(data);
+    nuevoPersonal.trabajadorId = data.id;
+    altaTrabajador.nombre = '';
+    altaTrabajador.oficio = '';
+    mostrarAltaTrabajador.value = false;
+  } catch (err) {
+    errorAltaTrabajador.value = err.response?.data?.error || 'No se pudo dar de alta al trabajador.';
+  } finally {
+    guardandoTrabajador.value = false;
+  }
+}
 
 const montoManoDeObra = computed(() =>
   items.value.filter((i) => i.esManoDeObra).reduce((acc, i) => acc + Number(i.cantidadRequerida || 0) * i.costoUnitario, 0)

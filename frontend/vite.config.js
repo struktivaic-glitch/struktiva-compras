@@ -7,6 +7,11 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registramos el service worker a mano en main.js (via virtual:pwa-register) para poder
+      // detectar cuándo hay una versión nueva y recargar automáticamente — de lo contrario, en
+      // una SPA que casi nunca hace una navegación completa del navegador, el usuario se puede
+      // quedar viendo el bundle viejo por horas aunque ya haya un despliegue nuevo.
+      injectRegister: false,
       includeAssets: ['icons/favicon-32.png'],
       manifest: {
         name: 'Struktiva · Control de Compras',
