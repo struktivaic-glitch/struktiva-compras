@@ -23,28 +23,29 @@
     </header>
 
     <nav class="bg-white border-b border-slate-200 no-print relative" ref="navRef">
-      <div class="max-w-6xl mx-auto px-5">
+      <div class="max-w-6xl mx-auto px-5 py-2 flex items-center gap-2 flex-wrap">
         <button
-          class="w-full flex items-center justify-between gap-3 py-3 text-[14px] font-bold text-slate-700"
-          @click="menuAbierto = !menuAbierto"
+          v-for="g in gruposVisibles"
+          :key="g.clave"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[14px] font-bold"
+          :class="grupoAbierto === g.clave || grupoActivo === g.clave ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'"
+          @click="grupoAbierto = grupoAbierto === g.clave ? null : g.clave"
         >
-          <span class="flex items-center gap-2">
-            <span class="text-[18px] leading-none">☰</span>
-            Menú
-          </span>
-          <span class="text-[13px] font-semibold text-primary truncate">{{ paginaActual }}</span>
+          <span class="text-[16px] leading-none">{{ g.icono }}</span>
+          Menú {{ g.label }}
+          <span class="text-[10px]">▾</span>
         </button>
       </div>
 
-      <div v-if="menuAbierto" class="absolute left-0 right-0 bg-white border-b border-slate-200 shadow-lg z-40 max-h-[70vh] overflow-y-auto">
+      <div v-if="grupoAbierto" class="absolute left-0 right-0 bg-white border-b border-slate-200 shadow-lg z-40 max-h-[70vh] overflow-y-auto">
         <div class="max-w-6xl mx-auto px-5 py-2 flex flex-col">
           <RouterLink
-            v-for="item in navVisible"
+            v-for="item in itemsDelGrupoAbierto"
             :key="item.to"
             :to="item.to"
             class="px-2 py-3 text-[14px] font-semibold text-slate-600 border-b border-slate-100 last:border-b-0"
             active-class="!text-primary"
-            @click="menuAbierto = false"
+            @click="grupoAbierto = null"
           >
             {{ item.label }}
           </RouterLink>
@@ -69,39 +70,62 @@ import { useAuthStore } from '../stores/auth.js';
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
-const menuAbierto = ref(false);
+const grupoAbierto = ref(null);
 const navRef = ref(null);
 
-const nav = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/requisiciones', label: 'Requisiciones' },
-  { to: '/cotizaciones', label: 'Cotizaciones' },
-  { to: '/ordenes-compra', label: 'Órdenes de compra' },
-  { to: '/almacen/entradas', label: 'Entradas' },
-  { to: '/almacen/salidas', label: 'Salidas' },
-  { to: '/almacen/inventario', label: 'Inventario' },
-  { to: '/facturas', label: 'Facturas' },
-  { to: '/pagos', label: 'Pagos' },
-  { to: '/proveedores', label: 'Proveedores' },
-  { to: '/trabajadores', label: 'Personal' },
-  { to: '/asistencia', label: 'Asistencia' },
-  { to: '/incidencias', label: 'Incidencias' },
-  { to: '/pagos-personal', label: 'Pagos a Personal' },
-  { to: '/reportes', label: 'Reportes' },
-  { to: '/importar-insumos', label: 'Importar Insumos' },
-  { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },
+const grupos = [
+  {
+    clave: 'insumos', label: 'Insumos', icono: '📥',
+    items: [
+      { to: '/', label: 'Dashboard' },
+      { to: '/requisiciones', label: 'Requisiciones' },
+      { to: '/cotizaciones', label: 'Cotizaciones' },
+      { to: '/proveedores', label: 'Proveedores' },
+      { to: '/ordenes-compra', label: 'Órdenes de compra' },
+      { to: '/importar-insumos', label: 'Importar Insumos' },
+      { to: '/reportes', label: 'Reportes' },
+    ],
+  },
+  {
+    clave: 'almacen', label: 'Almacén', icono: '🏬',
+    items: [
+      { to: '/almacen/entradas', label: 'Entradas' },
+      { to: '/almacen/salidas', label: 'Salidas' },
+      { to: '/almacen/inventario', label: 'Inventario' },
+      { to: '/facturas', label: 'Facturas' },
+      { to: '/pagos', label: 'Pagos' },
+    ],
+  },
+  {
+    clave: 'rh', label: 'R.H.', icono: '👥',
+    items: [
+      { to: '/trabajadores', label: 'Personal' },
+      { to: '/asistencia', label: 'Asistencia' },
+      { to: '/incidencias', label: 'Incidencias' },
+      { to: '/pagos-personal', label: 'Pagos a Personal' },
+      { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },
+    ],
+  },
 ];
 
-const navVisible = computed(() => nav.filter((item) => !item.roles || item.roles.includes(auth.rol)));
-const paginaActual = computed(() => navVisible.value.find((item) => item.to === route.path)?.label ?? '');
+const gruposVisibles = computed(() =>
+  grupos.map((g) => ({ ...g, items: g.items.filter((item) => !item.roles || item.roles.includes(auth.rol)) }))
+);
+const itemsDelGrupoAbierto = computed(() => gruposVisibles.value.find((g) => g.clave === grupoAbierto.value)?.items ?? []);
+
+function rutaPerteneceA(to) {
+  if (to === '/') return route.path === '/';
+  return route.path === to || route.path.startsWith(`${to}/`);
+}
+const grupoActivo = computed(() => gruposVisibles.value.find((g) => g.items.some((item) => rutaPerteneceA(item.to)))?.clave ?? null);
 
 watch(() => route.path, () => {
-  menuAbierto.value = false;
+  grupoAbierto.value = null;
 });
 
 function alHacerClicFuera(ev) {
-  if (menuAbierto.value && navRef.value && !navRef.value.contains(ev.target)) {
-    menuAbierto.value = false;
+  if (grupoAbierto.value && navRef.value && !navRef.value.contains(ev.target)) {
+    grupoAbierto.value = null;
   }
 }
 onMounted(() => document.addEventListener('click', alHacerClicFuera));
