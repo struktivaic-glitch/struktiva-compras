@@ -86,14 +86,11 @@ proyecto).
       apelar — es solo falta de "confianza" acumulada de la cuenta). Si algún día lo quieres
       retomar: prueba con el Facebook personal de otra persona del equipo, o usa Twilio como
       intermediario (evita depender de tu cuenta personal, tiene un costo pequeño por mensaje).
-- [ ] **Avisos por Telegram — construido, falta solo tu parte.** Decidiste ir por aquí en vez de
-      WhatsApp (sin los problemas de verificación de Meta). Para activarlo:
-      1. En Telegram, busca **@BotFather**, mándale `/newbot`, ponle nombre y usuario (debe
-         terminar en "bot").
-      2. Te da un **token** — pásamelo para configurarlo en el servidor.
-      3. Cuando esté activo, cada persona de tu equipo entra a su **Perfil** dentro del sistema y
-         da clic en "Vincular Telegram" — un proceso de un clic, sin que yo tenga que hacer nada
-         manual por cada usuario.
+- [x] **Avisos por Telegram — activo y probado.** Bot **@StruktivaAvisosBot** configurado,
+      webhook registrado, probado de punta a punta (vinculación + desvinculación). Falta que
+      cada persona del equipo lo vincule por su cuenta: entrar a **Perfil** dentro del sistema →
+      "Vincular Telegram" → se abre Telegram con un mensaje precargado → dar "Enviar" → listo.
+      Toma 10 segundos por persona, nadie necesita que yo intervenga.
 - [ ] **Reglas de negocio pendientes de definir** para el candado de "Cambio de precio" (Bloque
       16): ¿qué % de variación entre el precio cotizado/facturado y el presupuestado debe
       detener el proceso?, y ¿quién lo autoriza (propongo Dirección, confírmalo o cámbialo)?
