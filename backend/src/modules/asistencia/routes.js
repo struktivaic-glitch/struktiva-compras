@@ -1,12 +1,15 @@
 import { pool } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 
-// Asistencia / checador — entrada y salida diaria del Personal (catálogo `trabajadores`).
-// Control interno, no calcula nómina ni faltas automáticamente (eso es del módulo de
-// Incidencias). Gestionable por Residente, Superintendente y Dirección; el resto de roles
-// puede consultar.
+// Asistencia / checador — entrada, salida y comida diaria del Personal (catálogo `trabajadores`).
+// Diseñado para apoyar el registro electrónico de jornada que exige la LFT (Art. 132 Fracc.
+// XXXIV): las marcas originales son inalterables — nunca se sobrescriben — y cualquier
+// corrección posterior queda registrada aparte, con motivo obligatorio (ver
+// `asistencia_correcciones`, migración 017). El cálculo de horas extra es una sugerencia
+// configurable (ver `configuracionJornada/routes.js`), no un dictamen legal.
 
 const ROLES_GESTION = ['residente', 'superintendente', 'direccion'];
+const CAMPOS_CORREGIBLES = ['hora_entrada', 'hora_salida', 'hora_inicio_comida', 'hora_fin_comida'];
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -15,13 +18,13 @@ function hoy() {
 export default async function asistenciaRoutes(app) {
   app.addHook('preHandler', app.authenticate);
 
-  // Vista de checador: todo el personal activo (filtrable por obra) con su entrada/salida del día.
+  // Vista de checador: todo el personal activo (filtrable por obra) con su jornada del día.
   app.get('/api/asistencias/checador', async (request) => {
     const dia = request.query.fecha || hoy();
     const obraId = request.query.obraId || null;
     const { rows } = await pool.query(
       `SELECT t.id AS trabajador_id, t.nombre, t.tipo, t.oficio, t.puesto, t.obra_id,
-              a.id AS asistencia_id, a.hora_entrada, a.hora_salida
+              a.id AS asistencia_id, a.hora_entrada, a.hora_salida, a.hora_inicio_comida, a.hora_fin_comida, a.corregido
        FROM trabajadores t
        LEFT JOIN asistencias a ON a.trabajador_id = t.id AND a.fecha = $1
        WHERE t.activo ${obraId ? 'AND t.obra_id = $2' : ''}
@@ -54,6 +57,16 @@ export default async function asistenciaRoutes(app) {
     return rows;
   });
 
+  app.get('/api/asistencias/:id/correcciones', async (request) => {
+    const { rows } = await pool.query(
+      `SELECT c.*, u.nombre AS corregido_por_nombre FROM asistencia_correcciones c
+       JOIN usuarios u ON u.id = c.corregido_por
+       WHERE c.asistencia_id = $1 ORDER BY c.corregido_en DESC`,
+      [request.params.id]
+    );
+    return rows;
+  });
+
   app.post('/api/asistencias/entrada', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
     const { trabajadorId, fecha, obraId, gpsLat, gpsLng } = request.body ?? {};
     if (!trabajadorId) return reply.code(400).send({ error: 'trabajadorId es obligatorio' });
@@ -70,7 +83,7 @@ export default async function asistenciaRoutes(app) {
     let row;
     if (existentes[0]) {
       const { rows } = await pool.query(
-        `UPDATE asistencias SET hora_entrada = now(), obra_id = COALESCE($2, obra_id),
+        `UPDATE asistencias SET hora_entrada = now(), hora_entrada_original = now(), obra_id = COALESCE($2, obra_id),
            gps_lat_entrada = $3, gps_lng_entrada = $4, registrado_por = $5, actualizado_en = now()
          WHERE id = $1 RETURNING *`,
         [existentes[0].id, obraId || null, gpsLat ?? null, gpsLng ?? null, request.user.sub]
@@ -78,8 +91,8 @@ export default async function asistenciaRoutes(app) {
       row = rows[0];
     } else {
       const { rows } = await pool.query(
-        `INSERT INTO asistencias (trabajador_id, fecha, hora_entrada, obra_id, gps_lat_entrada, gps_lng_entrada, registrado_por)
-         VALUES ($1, $2, now(), $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO asistencias (trabajador_id, fecha, hora_entrada, hora_entrada_original, obra_id, gps_lat_entrada, gps_lng_entrada, registrado_por)
+         VALUES ($1, $2, now(), now(), $3, $4, $5, $6) RETURNING *`,
         [trabajadorId, dia, obraId || null, gpsLat ?? null, gpsLng ?? null, request.user.sub]
       );
       row = rows[0];
@@ -108,7 +121,7 @@ export default async function asistenciaRoutes(app) {
     }
 
     const { rows } = await pool.query(
-      `UPDATE asistencias SET hora_salida = now(), gps_lat_salida = $2, gps_lng_salida = $3, actualizado_en = now()
+      `UPDATE asistencias SET hora_salida = now(), hora_salida_original = now(), gps_lat_salida = $2, gps_lng_salida = $3, actualizado_en = now()
        WHERE id = $1 RETURNING *`,
       [existentes[0].id, gpsLat ?? null, gpsLng ?? null]
     );
@@ -119,20 +132,145 @@ export default async function asistenciaRoutes(app) {
     return rows[0];
   });
 
-  // Corrección manual (ej. se olvidó marcar, o se marcó a deshoras).
-  app.put('/api/asistencias/:id', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
-    const { id } = request.params;
-    const { horaEntrada, horaSalida, notas } = request.body ?? {};
-    const { rows } = await pool.query(
-      `UPDATE asistencias SET hora_entrada = $2, hora_salida = $3, notas = $4, actualizado_en = now()
-       WHERE id = $1 RETURNING *`,
-      [id, horaEntrada || null, horaSalida || null, notas?.trim() || null]
-    );
-    if (!rows[0]) return reply.code(404).send({ error: 'Registro de asistencia no encontrado' });
+  app.post('/api/asistencias/comida-inicio', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { trabajadorId, fecha } = request.body ?? {};
+    if (!trabajadorId) return reply.code(400).send({ error: 'trabajadorId es obligatorio' });
+    const dia = fecha || hoy();
 
+    const { rows: existentes } = await pool.query(
+      'SELECT id, hora_entrada, hora_inicio_comida FROM asistencias WHERE trabajador_id = $1 AND fecha = $2',
+      [trabajadorId, dia]
+    );
+    if (!existentes[0]?.hora_entrada) return reply.code(422).send({ error: 'No tiene entrada registrada ese día' });
+    if (existentes[0].hora_inicio_comida) return reply.code(409).send({ error: 'Ya tiene inicio de comida registrado ese día' });
+
+    const { rows } = await pool.query(
+      `UPDATE asistencias SET hora_inicio_comida = now(), hora_inicio_comida_original = now(), actualizado_en = now()
+       WHERE id = $1 RETURNING *`,
+      [existentes[0].id]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  app.post('/api/asistencias/comida-fin', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { trabajadorId, fecha } = request.body ?? {};
+    if (!trabajadorId) return reply.code(400).send({ error: 'trabajadorId es obligatorio' });
+    const dia = fecha || hoy();
+
+    const { rows: existentes } = await pool.query(
+      'SELECT id, hora_inicio_comida, hora_fin_comida FROM asistencias WHERE trabajador_id = $1 AND fecha = $2',
+      [trabajadorId, dia]
+    );
+    if (!existentes[0]?.hora_inicio_comida) return reply.code(422).send({ error: 'No tiene inicio de comida registrado ese día' });
+    if (existentes[0].hora_fin_comida) return reply.code(409).send({ error: 'Ya tiene fin de comida registrado ese día' });
+
+    const { rows } = await pool.query(
+      `UPDATE asistencias SET hora_fin_comida = now(), hora_fin_comida_original = now(), actualizado_en = now()
+       WHERE id = $1 RETURNING *`,
+      [existentes[0].id]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  // Corrección manual — a diferencia de las marcas originales (inalterables), esto exige un
+  // motivo y queda registrado como un evento aparte en `asistencia_correcciones`, nunca pisa el
+  // valor "_original" correspondiente.
+  app.post('/api/asistencias/:id/corregir', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { id } = request.params;
+    const { campo, valorNuevo, motivo } = request.body ?? {};
+    if (!CAMPOS_CORREGIBLES.includes(campo)) return reply.code(400).send({ error: 'Campo a corregir inválido' });
+    if (!valorNuevo) return reply.code(400).send({ error: 'El nuevo valor es obligatorio' });
+    if (!motivo?.trim() || motivo.trim().length < 5) {
+      return reply.code(400).send({ error: 'El motivo de la corrección es obligatorio (mínimo 5 caracteres) — se guarda como evidencia.' });
+    }
+
+    const { rows: existentes } = await pool.query(`SELECT id, ${campo} AS valor_actual FROM asistencias WHERE id = $1`, [id]);
+    if (!existentes[0]) return reply.code(404).send({ error: 'Registro de asistencia no encontrado' });
+
+    const { rows } = await pool.query(
+      `UPDATE asistencias SET ${campo} = $2, corregido = true, actualizado_en = now() WHERE id = $1 RETURNING *`,
+      [id, valorNuevo]
+    );
+    await pool.query(
+      `INSERT INTO asistencia_correcciones (asistencia_id, campo, valor_anterior, valor_nuevo, motivo, corregido_por)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, campo, existentes[0].valor_actual, valorNuevo, motivo.trim(), request.user.sub]
+    );
     await registrarBitacora(pool, {
-      tabla: 'asistencias', registroId: id, usuarioId: request.user.sub, accion: 'corregir', despues: rows[0],
+      tabla: 'asistencias', registroId: id, usuarioId: request.user.sub, accion: 'corregir',
+      antes: { [campo]: existentes[0].valor_actual }, despues: { [campo]: valorNuevo, motivo: motivo.trim() },
     });
     return rows[0];
+  });
+
+  // Sugerencia de horas ordinarias/dobles/triples por semana, según la configuración vigente de
+  // jornada (ver configuracionJornada/routes.js). Es un apoyo de cálculo, no un dictamen legal —
+  // recomendable validar el criterio con asesoría laboral antes de usarlo para nómina real.
+  app.get('/api/asistencias/horas-extra', async (request) => {
+    const { desde, hasta, trabajadorId } = request.query;
+    if (!desde || !hasta) return { error: 'desde y hasta son obligatorios' };
+
+    const condiciones = ['a.fecha BETWEEN $1 AND $2', 'a.hora_entrada IS NOT NULL', 'a.hora_salida IS NOT NULL'];
+    const valores = [desde, hasta];
+    if (trabajadorId) { valores.push(trabajadorId); condiciones.push(`a.trabajador_id = $${valores.length}`); }
+
+    const { rows: registros } = await pool.query(
+      `SELECT a.trabajador_id, t.nombre AS trabajador_nombre, a.fecha, a.hora_entrada, a.hora_salida,
+              a.hora_inicio_comida, a.hora_fin_comida
+       FROM asistencias a JOIN trabajadores t ON t.id = a.trabajador_id
+       WHERE ${condiciones.join(' AND ')}
+       ORDER BY a.trabajador_id, a.fecha`,
+      valores
+    );
+    const { rows: config } = await pool.query('SELECT * FROM configuracion_jornada ORDER BY vigente_desde');
+
+    function configVigente(fecha) {
+      // pg regresa columnas DATE como objetos Date de JS — comparar un Date contra un string con
+      // <= usa Date.prototype.toString() (no ISO), lo que rompía silenciosamente esta comparación.
+      // Se normalizan ambos lados a 'YYYY-MM-DD' antes de comparar.
+      const buscada = fecha.toISOString().slice(0, 10);
+      const aplicables = config.filter((c) => new Date(c.vigente_desde).toISOString().slice(0, 10) <= buscada);
+      return aplicables[aplicables.length - 1] ?? null;
+    }
+    function inicioSemana(fecha) {
+      const d = new Date(fecha);
+      const diaSemana = (d.getUTCDay() + 6) % 7; // lunes=0 ... domingo=6
+      d.setUTCDate(d.getUTCDate() - diaSemana);
+      return d.toISOString().slice(0, 10);
+    }
+
+    const porSemana = new Map(); // clave: trabajadorId|semanaInicio
+    for (const r of registros) {
+      const horasComida = r.hora_inicio_comida && r.hora_fin_comida
+        ? (new Date(r.hora_fin_comida) - new Date(r.hora_inicio_comida)) / 3_600_000
+        : 0;
+      const horasDia = Math.max(0, (new Date(r.hora_salida) - new Date(r.hora_entrada)) / 3_600_000 - horasComida);
+      const semanaInicio = inicioSemana(r.fecha);
+      const clave = `${r.trabajador_id}|${semanaInicio}`;
+      if (!porSemana.has(clave)) {
+        porSemana.set(clave, { trabajadorId: r.trabajador_id, trabajadorNombre: r.trabajador_nombre, semanaInicio, horasTrabajadas: 0 });
+      }
+      porSemana.get(clave).horasTrabajadas += horasDia;
+    }
+
+    return Array.from(porSemana.values()).map((s) => {
+      const cfg = configVigente(new Date(s.semanaInicio));
+      const jornada = cfg ? Number(cfg.jornada_semanal_horas) : null;
+      const topeDobles = cfg ? Number(cfg.limite_semanal_dobles_horas) : null;
+      const horasTrabajadas = Number(s.horasTrabajadas.toFixed(2));
+      const horasOrdinarias = jornada != null ? Math.min(horasTrabajadas, jornada) : horasTrabajadas;
+      const horasExtraTotales = jornada != null ? Math.max(0, horasTrabajadas - jornada) : 0;
+      const horasDobles = topeDobles != null ? Math.min(horasExtraTotales, topeDobles) : horasExtraTotales;
+      const horasTriples = topeDobles != null ? Math.max(0, horasExtraTotales - topeDobles) : 0;
+      return {
+        ...s,
+        horasTrabajadas,
+        jornadaVigente: jornada,
+        topeDoblesVigente: topeDobles,
+        horasOrdinarias: Number(horasOrdinarias.toFixed(2)),
+        horasDobles: Number(horasDobles.toFixed(2)),
+        horasTriples: Number(horasTriples.toFixed(2)),
+      };
+    }).sort((a, b) => a.trabajadorNombre.localeCompare(b.trabajadorNombre) || a.semanaInicio.localeCompare(b.semanaInicio));
   });
 }

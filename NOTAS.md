@@ -339,6 +339,40 @@ cambio de estructura de base de datos.
 
   **Con esto queda cerrado el plan original del módulo de Recursos Humanos**: Expediente de
   Personal (HR-A) → Asistencia/checador (HR-B) → Incidencias (HR-C) → Pagos a Personal (HR-D).
+- **Bloque HR-E** (05/08/2026): Cumplimiento de jornada laboral (LFT Art. 132 Fracc. XXXIV,
+  Art. 66-68, reforma de jornada de 40 horas DOF 01-05-2026). Pedido explícito del cliente tras
+  compartir el marco normativo; se investigó el estado real de la reforma antes de construir
+  (no se asumió nada): calendario gradual verificado 48h(2026)→46h(2027)→44h(2028)→42h(2029)→
+  40h(2030), tope semanal de horas dobles 9h(2026-27)→10h(28)→11h(29)→12h(30), triple después de
+  ese tope. **Aclarado explícitamente con el cliente que esto es infraestructura de apoyo, no una
+  certificación legal** — la validación final requiere asesoría laboral, sobre todo porque hay
+  ambigüedad publicada sobre el criterio exacto (diario vs. semanal) de cómputo de horas extra.
+  Al revisar el horario real del cliente (L-V 8-13/14-18, sáb 8-13 = 50h/semana) se detectó que ya
+  excede el máximo legal 2026 (48h) en 2 horas — dato que se le señaló directamente.
+  - Migración 017: las marcas de entrada/salida/comida ahora son **inalterables de verdad** — se
+    agregaron columnas `_original` que nunca se tocan después de creadas; toda corrección posterior
+    exige motivo y queda en `asistencia_correcciones` (quién, cuándo, valor anterior/nuevo, por
+    qué), sin pisar el original. Nueva tabla `configuracion_jornada` con el calendario de la
+    reforma como datos editables (no hardcodeados en el código) — Dirección puede ajustarlo si la
+    ley cambia o si su asesoría laboral confirma un criterio distinto.
+  - Backend: `/api/asistencias/comida-inicio` y `/comida-fin` (mismo patrón de entrada/salida);
+    `/api/asistencias/:id/corregir` (reemplaza el PUT anterior que sobrescribía sin dejar rastro);
+    `/api/asistencias/horas-extra` (sugerencia semanal de ordinarias/dobles/triples según la
+    configuración vigente); `/api/configuracion-jornada` (CRUD, solo Dirección para escribir).
+  - Frontend: Checador con marcas de comida y badge "✎ corregido"; modal de corrección con motivo
+    obligatorio; nueva pestaña "Horas extra" con la tabla semanal, aviso de que es una sugerencia
+    (no dictamen legal) y una sección para que Dirección administre el calendario vigente.
+  - **Bug real encontrado y corregido durante la prueba**: la comparación de fechas para encontrar
+    la configuración vigente comparaba un objeto `Date` de JS contra un string ISO con `<=`, lo
+    que usa `Date.toString()` (formato no comparable) en vez de la fecha — el resultado siempre
+    daba `null` silenciosamente. Corregido normalizando ambos lados a `YYYY-MM-DD` antes de
+    comparar.
+  - Probado de punta a punta contra Neon con el horario real del cliente simulado (L-V 9h + sáb
+    5h = 50h/semana): el sistema calculó exactamente 48h ordinarias + 2h dobles + 0h triples,
+    coincidiendo con el cálculo manual. También probados: inmutabilidad del original tras
+    corregir, historial de corrección completo, motivo corto rechazado (400), permisos de
+    Dirección para configuración (403 para otros roles), fecha duplicada rechazada (409) — datos
+    de prueba eliminados después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo
