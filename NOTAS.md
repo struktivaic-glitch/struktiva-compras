@@ -278,6 +278,25 @@ cambio de estructura de base de datos.
   Requisición individual, Orden de Compra y cuadro comparativo de Cotización; modal "Ver catálogo
   completo" en Nueva Requisición (todos los insumos de la obra agrupados por familia, con
   filtro) para cuando no se conoce la clave/descripción exacta a buscar.
+- **Bloque HR-A** (05/08/2026): Expediente de Personal — primer bloque de un módulo de Recursos
+  Humanos más amplio (asistencia e incidencias quedan para bloques siguientes), acordado
+  explícitamente con el cliente: control interno de gasto, **nunca nómina fiscal real** (sin ISR,
+  IMSS ni timbrado CFDI) — si algún día se necesita nómina fiscal, la recomendación es conectar
+  con un proveedor de nómina certificado (PAC), no construirlo aquí. Cubre tanto personal de
+  campo (jornaleros) como administrativo (oficina). Se amplió el catálogo `trabajadores` (el
+  mismo que ya usaba Mano de Obra) en vez de crear uno nuevo, para no duplicar el catálogo:
+  tipo (jornalero/administrativo), puesto, obra/frente asignado, fecha de ingreso, salario de
+  referencia (con periodo diario/mensual, solo control interno), teléfono, CURP, RFC, NSS,
+  dirección, contacto de emergencia y notas. Nueva tabla `documentos_personal` (INE, comprobante
+  de domicilio, contrato, etc.) — igual que la selfie de perfil (Bloque anterior), los documentos
+  se guardan en la base de datos y no en disco (Render free tier los borraría en cada deploy);
+  queda anotado como punto a revisar si el catálogo crece mucho (migrar a Object Storage real).
+  Nueva pantalla `/trabajadores/:id` con el expediente completo editable y gestión de documentos
+  (subir/ver/eliminar). El menú se renombró de "Trabajadores" a "Personal". Probado de punta a
+  punta contra Neon: alta de un administrativo, edición del expediente completo, subida de un
+  documento (verificado byte a byte que lo que se sube es exactamente lo que se descarga),
+  acceso sin sesión bloqueado (401), rol sin permiso (Auditor) puede consultar pero no dar de
+  alta (403) — datos de prueba eliminados después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo

@@ -9,6 +9,7 @@ const routes = [
   { path: '/requisiciones/:id', name: 'requisicion-detalle', component: () => import('../views/RequisicionDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/proveedores', name: 'proveedores', component: () => import('../views/ProveedoresView.vue'), meta: { requiresAuth: true } },
   { path: '/trabajadores', name: 'trabajadores', component: () => import('../views/TrabajadoresView.vue'), meta: { requiresAuth: true } },
+  { path: '/trabajadores/:id', name: 'personal-detalle', component: () => import('../views/PersonalDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones', name: 'cotizaciones', component: () => import('../views/CotizacionesListView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones/nueva', name: 'cotizacion-nueva', component: () => import('../views/CotizacionNuevaView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },
   { path: '/cotizaciones/:id', name: 'cotizacion-detalle', component: () => import('../views/CotizacionDetalleView.vue'), meta: { requiresAuth: true } },
