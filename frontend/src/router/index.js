@@ -35,6 +35,7 @@ const routes = [
   { path: '/perfil', name: 'perfil', component: () => import('../views/PerfilView.vue'), meta: { requiresAuth: true } },
   { path: '/importar-insumos', name: 'importar-insumos', component: () => import('../views/ImportarInsumosView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },
   { path: '/usuarios', name: 'usuarios', component: () => import('../views/UsuariosView.vue'), meta: { requiresAuth: true, roles: ['direccion', 'auditor'] } },
+  { path: '/notificaciones', name: 'notificaciones', component: () => import('../views/NotificacionesView.vue'), meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

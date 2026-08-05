@@ -7,6 +7,7 @@
           <b class="font-display text-[17px] tracking-wide">STRUKTIVA</b>
           <div class="text-[11px] text-sky-100/80">Control de Compras y Requisiciones · Obra</div>
         </div>
+        <NotificacionesBell />
         <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full pl-1 pr-3 py-1 text-xs">
           <span class="w-6 h-6 rounded-full bg-accent text-[#06282a] font-bold flex items-center justify-center text-[11px]">
             {{ iniciales }}
@@ -42,6 +43,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import BrandMark from './BrandMark.vue';
+import NotificacionesBell from './NotificacionesBell.vue';
 import { useAuthStore } from '../stores/auth.js';
 
 const auth = useAuthStore();

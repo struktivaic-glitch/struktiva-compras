@@ -19,6 +19,7 @@ import reportesRoutes from './modules/reportes/routes.js';
 import explosionInsumosRoutes from './modules/importaciones/explosionInsumos.js';
 import usuariosRoutes from './modules/usuarios/routes.js';
 import firmasRoutes from './modules/firmas/routes.js';
+import notificacionesRoutes from './modules/notificaciones/routes.js';
 import { uploadsDir } from './lib/storage.js';
 
 export async function buildApp() {
@@ -53,6 +54,7 @@ export async function buildApp() {
   await app.register(explosionInsumosRoutes);
   await app.register(usuariosRoutes);
   await app.register(firmasRoutes);
+  await app.register(notificacionesRoutes);
 
   return app;
 }

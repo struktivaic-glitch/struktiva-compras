@@ -2,6 +2,7 @@ import { pool, withTransaction } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
 import { registrarFirma } from '../../lib/firma.js';
+import { notificarPorRol } from '../../lib/notificaciones.js';
 
 async function cargarRequisicionCompleta(client, id) {
   const { rows: cab } = await client.query(
@@ -161,7 +162,7 @@ export default async function requisicionesRoutes(app) {
   app.post('/api/requisiciones/:id/enviar', async (request, reply) => {
     const { id } = request.params;
     const resultado = await withTransaction(async (client) => {
-      const { rows } = await client.query('SELECT estatus, usuario_solicitante_id FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
+      const { rows } = await client.query('SELECT estatus, folio, usuario_solicitante_id FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
       const req = rows[0];
       if (!req) return { error: 404 };
       if (req.estatus !== 'borrador') return { error: 409, mensaje: 'Solo un borrador puede enviarse a autorización' };
@@ -170,6 +171,12 @@ export default async function requisicionesRoutes(app) {
       await registrarBitacora(client, {
         tabla: 'requisiciones', registroId: id, usuarioId: request.user.sub, accion: 'enviar_autorizacion',
         antes: { estatus: 'borrador' }, despues: { estatus: 'pendiente_autorizacion' },
+      });
+      await notificarPorRol(client, {
+        roles: ['superintendente', 'direccion'], categoria: 'requisicion', entidadTipo: 'requisicion', entidadId: Number(id),
+        titulo: `Requisición ${req.folio} pendiente de autorizar`,
+        mensaje: 'Requiere tu autorización para continuar.',
+        excluirUsuarioId: request.user.sub,
       });
       return { ok: true };
     });
@@ -185,12 +192,18 @@ export default async function requisicionesRoutes(app) {
 
     try {
       await withTransaction(async (client) => {
-        const { rows } = await client.query('SELECT estatus FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
+        const { rows } = await client.query('SELECT estatus, folio FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
         const req = rows[0];
         if (!req) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
         if (req.estatus !== 'pendiente_autorizacion') {
           throw Object.assign(new Error('NO_PENDIENTE'), { code: 409 });
         }
+
+        const { rows: excedRows } = await client.query(
+          'SELECT COUNT(*) FROM requisicion_detalle WHERE requisicion_id = $1 AND excede_presupuesto',
+          [id]
+        );
+        const tieneExcedente = Number(excedRows[0].count) > 0;
 
         await registrarFirma(client, { request, entidadTipo: 'requisicion', entidadId: id, firma });
 
@@ -206,6 +219,18 @@ export default async function requisicionesRoutes(app) {
           tabla: 'requisiciones', registroId: id, usuarioId: request.user.sub, accion: 'autorizar',
           antes: { estatus: 'pendiente_autorizacion' }, despues: { estatus: 'autorizada', firma: firma?.tipo },
         });
+
+        // El excedente lo puede autorizar Superintendente o Dirección — al que NO lo hizo se le
+        // avisa que el otro ya hizo el ajuste, para que ambos queden enterados.
+        if (tieneExcedente) {
+          const otroRol = request.user.rol === 'direccion' ? 'superintendente' : 'direccion';
+          await notificarPorRol(client, {
+            roles: [otroRol], categoria: 'excedente', entidadTipo: 'requisicion', entidadId: Number(id),
+            titulo: `Excedente autorizado en requisición ${req.folio}`,
+            mensaje: `${request.user.nombre} autorizó el excedente de presupuesto de esta requisición.`,
+            excluirUsuarioId: request.user.sub,
+          });
+        }
       });
     } catch (err) {
       if (err.code === 404) return reply.code(404).send({ error: 'Requisición no encontrada' });
@@ -224,7 +249,7 @@ export default async function requisicionesRoutes(app) {
   app.post('/api/requisiciones/:id/cancelar', async (request, reply) => {
     const { id } = request.params;
     const resultado = await withTransaction(async (client) => {
-      const { rows } = await client.query('SELECT estatus FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
+      const { rows } = await client.query('SELECT estatus, folio FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
       const req = rows[0];
       if (!req) return { error: 404 };
       if (['atendida_parcial', 'atendida_total', 'cancelada'].includes(req.estatus)) {
@@ -235,6 +260,13 @@ export default async function requisicionesRoutes(app) {
       await registrarBitacora(client, {
         tabla: 'requisiciones', registroId: id, usuarioId: request.user.sub, accion: 'cancelar',
         antes: { estatus: req.estatus }, despues: { estatus: 'cancelada' },
+      });
+      // Aviso informativo — no bloquea al que cancela, solo mantiene a Dirección/Auditoría enteradas.
+      await notificarPorRol(client, {
+        roles: ['direccion', 'auditor'], categoria: 'cancelacion', entidadTipo: 'requisicion', entidadId: Number(id),
+        titulo: `Requisición ${req.folio} cancelada`,
+        mensaje: `${request.user.nombre} canceló esta requisición (estaba en estatus "${req.estatus}").`,
+        excluirUsuarioId: request.user.sub,
       });
       return { ok: true };
     });
