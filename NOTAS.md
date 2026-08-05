@@ -373,6 +373,29 @@ cambio de estructura de base de datos.
     corregir, historial de corrección completo, motivo corto rechazado (400), permisos de
     Dirección para configuración (403 para otros roles), fecha duplicada rechazada (409) — datos
     de prueba eliminados después.
+- **Bloque HR-F** (05/08/2026): Selfie opcional al marcar asistencia. El usuario preguntó si el
+  registro incluía foto o biométrico — no incluía ninguno. Se explicó la diferencia (esto no es
+  biometría real, no hay matching automático de identidad) y por qué vale la pena: hoy es el
+  supervisor quien marca a nombre del trabajador (no tiene cuenta propia), así que una selfie da
+  evidencia fotográfica revisable si hay una disputa, sin la complejidad/costo de reconocimiento
+  facial real. Mismo patrón que la selfie de perfil (Bloque anterior): comprimida en el navegador
+  (más agresivo aquí — 320px/calidad 0.7, porque el volumen es mucho mayor: varias marcas por
+  persona por día, todos los días, a diferencia de una sola foto de perfil) y guardada en la base
+  de datos. **Diseño clave: la selfie nunca bloquea la marca del horario** — se marca la hora
+  normal (instantáneo, como antes) y la foto se sube aparte como un botón secundario opcional
+  junto a cada hora ya marcada, mismo principio "best-effort" que ya se usa para el GPS.
+  - Migración 018: columnas `foto_entrada/salida/inicio_comida/fin_comida` (+ mime) en
+    `asistencias`. **Se revisó y corrigió cada `RETURNING *`/`SELECT *` existente sobre esa
+    tabla** (6 lugares) para que no viajen los bytea en cada respuesta de marcar/corregir —
+    ahora usan una lista explícita de columnas + banderas `tiene_foto_*` calculadas.
+  - Backend: `POST/GET /api/asistencias/:id/foto/:campo` (subir solo Residente/Superintendente/
+    Dirección; ver, cualquier rol autenticado, igual que el resto de fotos del sistema).
+  - Frontend: ícono 📷 junto a cada hora ya marcada (Checador) — capturar si no tiene foto, ver si
+    ya tiene; también íconos de solo-ver en Histórico para consulta/auditoría.
+  - Probado de punta a punta contra Neon: subida y descarga byte a byte idénticas, banderas
+    `tiene_foto_*` reflejadas correctamente en checador e histórico, campo de foto inválido
+    rechazado (400), sin foto da 404, sin sesión da 401, Auditor puede ver pero no subir (403) —
+    dato de prueba eliminado después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo

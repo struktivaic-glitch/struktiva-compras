@@ -6,6 +6,7 @@
         <p class="text-xs text-slate-500">
           Registro de jornada (entrada/salida/comida) — apoya el registro electrónico que exige la LFT
           (Art. 132 Fracc. XXXIV). Las marcas originales son inalterables; las correcciones quedan documentadas.
+          Selfie opcional (📷) junto a cada hora, no es biometría — solo evidencia fotográfica revisable.
         </p>
       </div>
       <div class="flex items-center gap-2 text-sm">
@@ -62,16 +63,30 @@
               <td class="px-4 py-2.5">
                 <span v-if="p.hora_entrada" class="text-success font-semibold">{{ formatoHora(p.hora_entrada) }}</span>
                 <span v-else class="text-slate-400">—</span>
+                <button v-if="p.hora_entrada && puedeMarcar" class="ml-1 align-middle" :title="p.tiene_foto_entrada ? 'Ver selfie' : 'Agregar selfie (opcional)'" @click="p.tiene_foto_entrada ? verFotoAsistencia(p.asistencia_id, 'entrada') : abrirCapturaFoto(p.asistencia_id, 'entrada')">
+                  {{ p.tiene_foto_entrada ? '📷✅' : '📷' }}
+                </button>
               </td>
               <td class="px-4 py-2.5 text-xs">
                 <span v-if="p.hora_inicio_comida || p.hora_fin_comida">
-                  {{ p.hora_inicio_comida ? formatoHora(p.hora_inicio_comida) : '—' }} / {{ p.hora_fin_comida ? formatoHora(p.hora_fin_comida) : '—' }}
+                  {{ p.hora_inicio_comida ? formatoHora(p.hora_inicio_comida) : '—' }}
+                  <button v-if="p.hora_inicio_comida && puedeMarcar" class="align-middle" :title="p.tiene_foto_inicio_comida ? 'Ver selfie' : 'Agregar selfie (opcional)'" @click="p.tiene_foto_inicio_comida ? verFotoAsistencia(p.asistencia_id, 'inicio_comida') : abrirCapturaFoto(p.asistencia_id, 'inicio_comida')">
+                    {{ p.tiene_foto_inicio_comida ? '📷✅' : '📷' }}
+                  </button>
+                  /
+                  {{ p.hora_fin_comida ? formatoHora(p.hora_fin_comida) : '—' }}
+                  <button v-if="p.hora_fin_comida && puedeMarcar" class="align-middle" :title="p.tiene_foto_fin_comida ? 'Ver selfie' : 'Agregar selfie (opcional)'" @click="p.tiene_foto_fin_comida ? verFotoAsistencia(p.asistencia_id, 'fin_comida') : abrirCapturaFoto(p.asistencia_id, 'fin_comida')">
+                    {{ p.tiene_foto_fin_comida ? '📷✅' : '📷' }}
+                  </button>
                 </span>
                 <span v-else class="text-slate-400">—</span>
               </td>
               <td class="px-4 py-2.5">
                 <span v-if="p.hora_salida" class="text-success font-semibold">{{ formatoHora(p.hora_salida) }}</span>
                 <span v-else class="text-slate-400">—</span>
+                <button v-if="p.hora_salida && puedeMarcar" class="ml-1 align-middle" :title="p.tiene_foto_salida ? 'Ver selfie' : 'Agregar selfie (opcional)'" @click="p.tiene_foto_salida ? verFotoAsistencia(p.asistencia_id, 'salida') : abrirCapturaFoto(p.asistencia_id, 'salida')">
+                  {{ p.tiene_foto_salida ? '📷✅' : '📷' }}
+                </button>
               </td>
               <td v-if="puedeMarcar" class="px-4 py-2.5 space-y-1">
                 <div class="space-x-2">
@@ -142,9 +157,21 @@
               <td class="py-2 font-sans">{{ formatoFecha(a.fecha) }}</td>
               <td class="py-2 font-semibold">{{ a.nombre }}<span v-if="a.corregido" class="ml-1 text-[10px] font-bold text-warning">✎</span></td>
               <td class="py-2 font-sans">{{ a.obra_nombre || '—' }}</td>
-              <td class="py-2 font-sans">{{ a.hora_entrada ? formatoHora(a.hora_entrada) : '—' }}</td>
-              <td class="py-2 font-sans text-xs">{{ a.hora_inicio_comida ? formatoHora(a.hora_inicio_comida) : '—' }} / {{ a.hora_fin_comida ? formatoHora(a.hora_fin_comida) : '—' }}</td>
-              <td class="py-2 font-sans">{{ a.hora_salida ? formatoHora(a.hora_salida) : '—' }}</td>
+              <td class="py-2 font-sans">
+                {{ a.hora_entrada ? formatoHora(a.hora_entrada) : '—' }}
+                <button v-if="a.tiene_foto_entrada" class="no-print" title="Ver selfie" @click="verFotoAsistencia(a.id, 'entrada')">📷</button>
+              </td>
+              <td class="py-2 font-sans text-xs">
+                {{ a.hora_inicio_comida ? formatoHora(a.hora_inicio_comida) : '—' }}
+                <button v-if="a.tiene_foto_inicio_comida" class="no-print" title="Ver selfie" @click="verFotoAsistencia(a.id, 'inicio_comida')">📷</button>
+                /
+                {{ a.hora_fin_comida ? formatoHora(a.hora_fin_comida) : '—' }}
+                <button v-if="a.tiene_foto_fin_comida" class="no-print" title="Ver selfie" @click="verFotoAsistencia(a.id, 'fin_comida')">📷</button>
+              </td>
+              <td class="py-2 font-sans">
+                {{ a.hora_salida ? formatoHora(a.hora_salida) : '—' }}
+                <button v-if="a.tiene_foto_salida" class="no-print" title="Ver selfie" @click="verFotoAsistencia(a.id, 'salida')">📷</button>
+              </td>
               <td class="py-2 font-sans">{{ horasTrabajadas(a) }}</td>
             </tr>
             <tr v-if="!historico.length">
@@ -271,6 +298,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Input oculto para capturar la selfie opcional al marcar -->
+    <input ref="fotoInputRef" type="file" accept="image/*" capture="user" class="hidden" @change="alSeleccionarFoto" />
   </AppShell>
 </template>
 
@@ -434,6 +464,64 @@ async function guardarCorreccion() {
     correccion.error = err.response?.data?.error || 'No se pudo guardar la corrección.';
   } finally {
     correccion.guardando = false;
+  }
+}
+
+// --- Selfie opcional por marca ---
+// Reforzar evidencia de que la marca corresponde a la persona real (hoy el supervisor marca a
+// nombre del trabajador, no hay login propio). Nunca bloquea la marca del horario — se sube
+// aparte y después, por eso vive como un botón secundario junto a cada hora ya marcada.
+const fotoInputRef = ref(null);
+const fotoObjetivo = reactive({ asistenciaId: null, campo: null });
+
+function abrirCapturaFoto(asistenciaId, campo) {
+  fotoObjetivo.asistenciaId = asistenciaId;
+  fotoObjetivo.campo = campo;
+  fotoInputRef.value?.click();
+}
+
+async function comprimirImagenAsistencia(file, maxDim = 320, calidad = 0.7) {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > maxDim || height > maxDim) {
+    if (width >= height) { height = Math.round((height * maxDim) / width); width = maxDim; }
+    else { width = Math.round((width * maxDim) / height); height = maxDim; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('sin blob'))), 'image/jpeg', calidad));
+}
+
+async function alSeleccionarFoto(ev) {
+  const file = ev.target.files?.[0];
+  ev.target.value = '';
+  if (!file || !fotoObjetivo.asistenciaId || !fotoObjetivo.campo) return;
+  error.value = '';
+  try {
+    const blob = await comprimirImagenAsistencia(file);
+    const form = new FormData();
+    form.append('foto', blob, 'selfie.jpg');
+    await api.post(`/asistencias/${fotoObjetivo.asistenciaId}/foto/${fotoObjetivo.campo}`, form);
+    mensaje.value = 'Selfie agregada.';
+    if (tab.value === 'checador') await cargarChecador();
+    else if (tab.value === 'historico') await cargarHistorico();
+  } catch (err) {
+    error.value = err.response?.data?.error || 'No se pudo guardar la selfie.';
+  } finally {
+    fotoObjetivo.asistenciaId = null;
+    fotoObjetivo.campo = null;
+  }
+}
+
+async function verFotoAsistencia(asistenciaId, campo) {
+  try {
+    const { data } = await api.get(`/asistencias/${asistenciaId}/foto/${campo}`, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    window.open(url, '_blank');
+  } catch {
+    error.value = 'No se pudo abrir la selfie.';
   }
 }
 

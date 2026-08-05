@@ -10,6 +10,18 @@ import { registrarBitacora } from '../../lib/audit.js';
 
 const ROLES_GESTION = ['residente', 'superintendente', 'direccion'];
 const CAMPOS_CORREGIBLES = ['hora_entrada', 'hora_salida', 'hora_inicio_comida', 'hora_fin_comida'];
+const CAMPOS_FOTO = ['entrada', 'salida', 'inicio_comida', 'fin_comida'];
+const MIME_FOTO_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const FOTO_MAX_BYTES = 4 * 1024 * 1024;
+
+// Columnas a devolver en INSERT/UPDATE de asistencias — nunca "RETURNING *": la tabla ahora
+// tiene columnas bytea (foto_*) que no deben viajar en cada respuesta de marcar/corregir.
+const COLUMNAS_RETORNO = `id, trabajador_id, fecha, hora_entrada, hora_salida, hora_inicio_comida, hora_fin_comida,
+  hora_entrada_original, hora_salida_original, hora_inicio_comida_original, hora_fin_comida_original,
+  obra_id, corregido, gps_lat_entrada, gps_lng_entrada, gps_lat_salida, gps_lng_salida,
+  registrado_por, notas, creado_en, actualizado_en,
+  (foto_entrada IS NOT NULL) AS tiene_foto_entrada, (foto_salida IS NOT NULL) AS tiene_foto_salida,
+  (foto_inicio_comida IS NOT NULL) AS tiene_foto_inicio_comida, (foto_fin_comida IS NOT NULL) AS tiene_foto_fin_comida`;
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -24,7 +36,9 @@ export default async function asistenciaRoutes(app) {
     const obraId = request.query.obraId || null;
     const { rows } = await pool.query(
       `SELECT t.id AS trabajador_id, t.nombre, t.tipo, t.oficio, t.puesto, t.obra_id,
-              a.id AS asistencia_id, a.hora_entrada, a.hora_salida, a.hora_inicio_comida, a.hora_fin_comida, a.corregido
+              a.id AS asistencia_id, a.hora_entrada, a.hora_salida, a.hora_inicio_comida, a.hora_fin_comida, a.corregido,
+              (a.foto_entrada IS NOT NULL) AS tiene_foto_entrada, (a.foto_salida IS NOT NULL) AS tiene_foto_salida,
+              (a.foto_inicio_comida IS NOT NULL) AS tiene_foto_inicio_comida, (a.foto_fin_comida IS NOT NULL) AS tiene_foto_fin_comida
        FROM trabajadores t
        LEFT JOIN asistencias a ON a.trabajador_id = t.id AND a.fecha = $1
        WHERE t.activo ${obraId ? 'AND t.obra_id = $2' : ''}
@@ -45,7 +59,13 @@ export default async function asistenciaRoutes(app) {
     if (trabajadorId) { valores.push(trabajadorId); condiciones.push(`a.trabajador_id = $${valores.length}`); }
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const { rows } = await pool.query(
-      `SELECT a.*, t.nombre, t.tipo, t.oficio, t.puesto, o.nombre AS obra_nombre
+      `SELECT a.id, a.trabajador_id, a.fecha, a.hora_entrada, a.hora_salida, a.hora_inicio_comida, a.hora_fin_comida,
+              a.hora_entrada_original, a.hora_salida_original, a.hora_inicio_comida_original, a.hora_fin_comida_original,
+              a.obra_id, a.corregido, a.gps_lat_entrada, a.gps_lng_entrada, a.gps_lat_salida, a.gps_lng_salida,
+              a.registrado_por, a.notas, a.creado_en, a.actualizado_en,
+              (a.foto_entrada IS NOT NULL) AS tiene_foto_entrada, (a.foto_salida IS NOT NULL) AS tiene_foto_salida,
+              (a.foto_inicio_comida IS NOT NULL) AS tiene_foto_inicio_comida, (a.foto_fin_comida IS NOT NULL) AS tiene_foto_fin_comida,
+              t.nombre, t.tipo, t.oficio, t.puesto, o.nombre AS obra_nombre
        FROM asistencias a
        JOIN trabajadores t ON t.id = a.trabajador_id
        LEFT JOIN obras o ON o.id = a.obra_id
@@ -85,14 +105,14 @@ export default async function asistenciaRoutes(app) {
       const { rows } = await pool.query(
         `UPDATE asistencias SET hora_entrada = now(), hora_entrada_original = now(), obra_id = COALESCE($2, obra_id),
            gps_lat_entrada = $3, gps_lng_entrada = $4, registrado_por = $5, actualizado_en = now()
-         WHERE id = $1 RETURNING *`,
+         WHERE id = $1 RETURNING ${COLUMNAS_RETORNO}`,
         [existentes[0].id, obraId || null, gpsLat ?? null, gpsLng ?? null, request.user.sub]
       );
       row = rows[0];
     } else {
       const { rows } = await pool.query(
         `INSERT INTO asistencias (trabajador_id, fecha, hora_entrada, hora_entrada_original, obra_id, gps_lat_entrada, gps_lng_entrada, registrado_por)
-         VALUES ($1, $2, now(), now(), $3, $4, $5, $6) RETURNING *`,
+         VALUES ($1, $2, now(), now(), $3, $4, $5, $6) RETURNING ${COLUMNAS_RETORNO}`,
         [trabajadorId, dia, obraId || null, gpsLat ?? null, gpsLng ?? null, request.user.sub]
       );
       row = rows[0];
@@ -122,7 +142,7 @@ export default async function asistenciaRoutes(app) {
 
     const { rows } = await pool.query(
       `UPDATE asistencias SET hora_salida = now(), hora_salida_original = now(), gps_lat_salida = $2, gps_lng_salida = $3, actualizado_en = now()
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1 RETURNING ${COLUMNAS_RETORNO}`,
       [existentes[0].id, gpsLat ?? null, gpsLng ?? null]
     );
     await registrarBitacora(pool, {
@@ -146,7 +166,7 @@ export default async function asistenciaRoutes(app) {
 
     const { rows } = await pool.query(
       `UPDATE asistencias SET hora_inicio_comida = now(), hora_inicio_comida_original = now(), actualizado_en = now()
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1 RETURNING ${COLUMNAS_RETORNO}`,
       [existentes[0].id]
     );
     return reply.code(201).send(rows[0]);
@@ -166,7 +186,7 @@ export default async function asistenciaRoutes(app) {
 
     const { rows } = await pool.query(
       `UPDATE asistencias SET hora_fin_comida = now(), hora_fin_comida_original = now(), actualizado_en = now()
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1 RETURNING ${COLUMNAS_RETORNO}`,
       [existentes[0].id]
     );
     return reply.code(201).send(rows[0]);
@@ -188,7 +208,7 @@ export default async function asistenciaRoutes(app) {
     if (!existentes[0]) return reply.code(404).send({ error: 'Registro de asistencia no encontrado' });
 
     const { rows } = await pool.query(
-      `UPDATE asistencias SET ${campo} = $2, corregido = true, actualizado_en = now() WHERE id = $1 RETURNING *`,
+      `UPDATE asistencias SET ${campo} = $2, corregido = true, actualizado_en = now() WHERE id = $1 RETURNING ${COLUMNAS_RETORNO}`,
       [id, valorNuevo]
     );
     await pool.query(
@@ -272,5 +292,46 @@ export default async function asistenciaRoutes(app) {
         horasTriples: Number(horasTriples.toFixed(2)),
       };
     }).sort((a, b) => a.trabajadorNombre.localeCompare(b.trabajadorNombre) || a.semanaInicio.localeCompare(b.semanaInicio));
+  });
+
+  // Selfie opcional por marca (entrada/salida/inicio_comida/fin_comida) — evidencia fotográfica
+  // de que la marca corresponde a la persona real, ya que quien marca es el supervisor a nombre
+  // del trabajador. Best-effort: nunca bloquea la marca del horario, se sube aparte y después.
+  app.post('/api/asistencias/:id/foto/:campo', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { id, campo } = request.params;
+    if (!CAMPOS_FOTO.includes(campo)) return reply.code(400).send({ error: 'Campo de foto inválido' });
+
+    const { rows: existe } = await pool.query('SELECT id FROM asistencias WHERE id = $1', [id]);
+    if (!existe[0]) return reply.code(404).send({ error: 'Registro de asistencia no encontrado' });
+
+    const archivo = await request.file();
+    if (!archivo) return reply.code(400).send({ error: 'No se recibió ninguna imagen' });
+    if (!MIME_FOTO_PERMITIDOS.has(archivo.mimetype)) {
+      return reply.code(400).send({ error: 'Formato de imagen no soportado. Usa JPG, PNG o WEBP.' });
+    }
+    const buffer = await archivo.toBuffer();
+    if (buffer.length > FOTO_MAX_BYTES) return reply.code(400).send({ error: 'La imagen es demasiado grande.' });
+
+    await pool.query(
+      `UPDATE asistencias SET foto_${campo} = $2, foto_${campo}_mime = $3 WHERE id = $1`,
+      [id, buffer, archivo.mimetype]
+    );
+    await registrarBitacora(pool, {
+      tabla: 'asistencias', registroId: id, usuarioId: request.user.sub, accion: `foto_${campo}`,
+    });
+    return { ok: true };
+  });
+
+  app.get('/api/asistencias/:id/foto/:campo', async (request, reply) => {
+    const { id, campo } = request.params;
+    if (!CAMPOS_FOTO.includes(campo)) return reply.code(400).send({ error: 'Campo de foto inválido' });
+
+    const { rows } = await pool.query(
+      `SELECT foto_${campo} AS foto, foto_${campo}_mime AS mime FROM asistencias WHERE id = $1`,
+      [id]
+    );
+    if (!rows[0]?.foto) return reply.code(404).send({ error: 'Esta marca no tiene foto' });
+    reply.header('Cache-Control', 'private, max-age=300');
+    return reply.type(rows[0].mime || 'image/jpeg').send(rows[0].foto);
   });
 }
