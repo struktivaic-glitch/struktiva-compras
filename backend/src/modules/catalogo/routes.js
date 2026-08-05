@@ -103,6 +103,32 @@ export default async function catalogoRoutes(app) {
   });
 
   // Saldos por familia de insumo dentro de una obra — usado por el Dashboard.
+  // Vista general: totales de presupuesto por cada obra activa, SIN sumarlas entre sí —
+  // cada renglón es una obra independiente. Para el Dashboard cuando hay 2+ obras activas.
+  app.get('/api/catalogo/obras/resumen', async () => {
+    const { rows } = await pool.query(
+      `WITH por_familia AS (
+         SELECT s.obra_id, COALESCE(fi.nombre, 'Sin familia') AS familia,
+                SUM(s.cantidad_presupuestada * s.costo_unitario) AS presupuestado,
+                SUM(s.cantidad_aprobada_acumulada * s.costo_unitario) AS aprobado
+         FROM vw_saldo_obra_insumo s
+         JOIN insumos i ON i.id = s.insumo_id
+         LEFT JOIN familias_insumo fi ON fi.id = i.familia_id
+         GROUP BY s.obra_id, COALESCE(fi.nombre, 'Sin familia')
+       )
+       SELECT o.id, o.nombre,
+              COALESCE(SUM(pf.presupuestado), 0) AS presupuestado,
+              COALESCE(SUM(pf.aprobado), 0) AS aprobado,
+              COUNT(*) FILTER (WHERE pf.presupuestado > 0 AND (pf.aprobado / NULLIF(pf.presupuestado, 0)) >= 0.9) AS familias_alerta
+       FROM obras o
+       LEFT JOIN por_familia pf ON pf.obra_id = o.id
+       WHERE o.estatus = 'activa'
+       GROUP BY o.id, o.nombre
+       ORDER BY o.nombre`
+    );
+    return rows;
+  });
+
   app.get('/api/catalogo/obras/:obraId/saldos-por-familia', async (request) => {
     const { obraId } = request.params;
     const { rows } = await pool.query(

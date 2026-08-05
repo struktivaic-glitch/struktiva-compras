@@ -2,11 +2,67 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <h2 class="text-[16px] font-display">Dashboard</h2>
-      <select v-if="obras.length" v-model.number="obraId" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2">
-        <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
-      </select>
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1 text-sm">
+          <button
+            class="min-h-[38px] px-3 rounded-lg font-semibold"
+            :class="vista === 'obra' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
+            @click="vista = 'obra'"
+          >
+            Por obra
+          </button>
+          <button
+            class="min-h-[38px] px-3 rounded-lg font-semibold"
+            :class="vista === 'general' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
+            @click="vista = 'general'; cargarResumen()"
+          >
+            Vista general
+          </button>
+        </div>
+        <select v-if="vista === 'obra' && obras.length" v-model.number="obraId" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2">
+          <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
+        </select>
+      </div>
     </div>
 
+    <!-- Vista general: cada obra activa con sus propios parámetros, sin sumarlas entre sí -->
+    <template v-if="vista === 'general'">
+      <div v-if="cargandoResumen" class="text-sm text-slate-500">Cargando resumen…</div>
+      <div v-else-if="errorResumen" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3">{{ errorResumen }}</div>
+      <div v-else class="overflow-x-auto bg-white border border-slate-200 rounded-xl">
+        <table class="w-full text-sm tabular-nums">
+          <thead>
+            <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+              <th class="text-left px-4 py-2.5 font-normal">Obra</th>
+              <th class="text-left px-4 py-2.5 font-normal">Presupuestado</th>
+              <th class="text-left px-4 py-2.5 font-normal">Comprometido</th>
+              <th class="text-left px-4 py-2.5 font-normal">Saldo disponible</th>
+              <th class="text-left px-4 py-2.5 font-normal">Familias en alerta</th>
+              <th class="text-left px-4 py-2.5 font-normal">Estatus</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="o in resumenObras" :key="o.id" class="border-t border-slate-200">
+              <td class="px-4 py-2.5 font-semibold font-sans">{{ o.nombre }}</td>
+              <td class="px-4 py-2.5">{{ mxn(o.presupuestado) }}</td>
+              <td class="px-4 py-2.5">{{ mxn(o.aprobado) }}</td>
+              <td class="px-4 py-2.5 font-semibold" :class="o.saldo >= 0 ? 'text-success' : 'text-danger'">{{ mxn(o.saldo) }}</td>
+              <td class="px-4 py-2.5">{{ o.familias_alerta }}</td>
+              <td class="px-4 py-2.5">
+                <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="estatusObraClase(o)">
+                  {{ estatusObraTexto(o) }}
+                </span>
+              </td>
+            </tr>
+            <tr v-if="!resumenObras.length">
+              <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm font-sans">No hay obras activas.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <template v-else>
     <div v-if="cargando" class="text-sm text-slate-500">Cargando saldos…</div>
 
     <div v-else-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3">
@@ -86,6 +142,7 @@
         </table>
       </div>
     </template>
+    </template>
   </AppShell>
 </template>
 
@@ -99,6 +156,39 @@ const error = ref('');
 const obras = ref([]);
 const obraId = ref(null);
 const familias = ref([]);
+
+const vista = ref('obra'); // 'obra' | 'general'
+const resumenObras = ref([]);
+const cargandoResumen = ref(false);
+const errorResumen = ref('');
+
+function estatusObraTexto(o) {
+  if (o.saldo < 0) return 'Excede presupuesto';
+  if (o.familias_alerta > 0) return 'Cerca del límite';
+  return 'Normal';
+}
+function estatusObraClase(o) {
+  if (o.saldo < 0) return 'bg-red-50 text-danger';
+  if (o.familias_alerta > 0) return 'bg-amber-50 text-warning';
+  return 'bg-emerald-50 text-success';
+}
+
+async function cargarResumen() {
+  cargandoResumen.value = true;
+  errorResumen.value = '';
+  try {
+    const { data } = await api.get('/catalogo/obras/resumen');
+    resumenObras.value = data.map((o) => {
+      const presupuestado = Number(o.presupuestado);
+      const aprobado = Number(o.aprobado);
+      return { ...o, presupuestado, aprobado, saldo: presupuestado - aprobado, familias_alerta: Number(o.familias_alerta) };
+    });
+  } catch (err) {
+    errorResumen.value = err.response?.data?.error || 'No se pudo cargar el resumen de obras.';
+  } finally {
+    cargandoResumen.value = false;
+  }
+}
 
 const obraNombre = computed(() => obras.value.find((o) => o.id === obraId.value)?.nombre ?? '');
 
