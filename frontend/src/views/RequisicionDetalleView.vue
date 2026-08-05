@@ -60,6 +60,32 @@
             </template>
           </tbody>
         </table>
+
+        <template v-if="req.personal?.length">
+          <h3 class="text-sm font-display mt-5 mb-2">Personal asignado (Mano de Obra)</h3>
+          <table class="w-full text-sm tabular-nums">
+            <thead>
+              <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <th class="text-left px-4 py-2.5 font-normal font-sans">Nombre</th>
+                <th class="text-left px-4 py-2.5 font-normal font-sans">Oficio</th>
+                <th class="text-left px-4 py-2.5 font-normal font-sans">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in req.personal" :key="p.id" class="border-t border-slate-200">
+                <td class="px-4 py-2.5 font-sans font-semibold">{{ p.nombre }}</td>
+                <td class="px-4 py-2.5 font-sans text-slate-500">{{ p.oficio || '—' }}</td>
+                <td class="px-4 py-2.5">{{ mxn(p.monto) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="border-t border-slate-300 font-bold">
+                <td class="px-4 py-2.5 font-sans" colspan="2">Total</td>
+                <td class="px-4 py-2.5">{{ mxn(totalPersonal) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </template>
       </div>
 
       <div class="flex flex-wrap gap-2 no-print">
@@ -119,6 +145,10 @@ const mostrarFirma = ref(false);
 const firmaModalRef = ref(null);
 
 const hayExcedente = computed(() => (req.value?.detalle ?? []).some((d) => d.excede_presupuesto));
+const totalPersonal = computed(() => (req.value?.personal ?? []).reduce((acc, p) => acc + Number(p.monto), 0));
+function mxn(n) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+}
 const puedeAutorizar = computed(() => ['superintendente', 'direccion'].includes(auth.rol));
 const puedeModificar = computed(() => req.value?.usuario_solicitante_id === auth.usuario?.id || auth.rol === 'direccion');
 

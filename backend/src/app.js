@@ -21,6 +21,7 @@ import usuariosRoutes from './modules/usuarios/routes.js';
 import firmasRoutes from './modules/firmas/routes.js';
 import notificacionesRoutes from './modules/notificaciones/routes.js';
 import telegramRoutes from './modules/telegram/routes.js';
+import trabajadoresRoutes from './modules/trabajadores/routes.js';
 import { uploadsDir } from './lib/storage.js';
 
 export async function buildApp() {
@@ -57,6 +58,7 @@ export async function buildApp() {
   await app.register(firmasRoutes);
   await app.register(notificacionesRoutes);
   await app.register(telegramRoutes);
+  await app.register(trabajadoresRoutes);
 
   return app;
 }

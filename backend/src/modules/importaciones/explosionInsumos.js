@@ -139,8 +139,11 @@ export default async function explosionInsumosRoutes(app) {
           let familiaId = null;
           if (item.familia) {
             if (!familiaIdPorNombre.has(item.familia)) {
+              // es_mano_de_obra solo se fija al crear la familia por primera vez (a partir del
+              // nombre tal cual venga del Excel) — si ya existía y alguien la ajustó a mano, un
+              // reimport no la debe pisar.
               const { rows } = await client.query(
-                `INSERT INTO familias_insumo (nombre) VALUES ($1)
+                `INSERT INTO familias_insumo (nombre, es_mano_de_obra) VALUES ($1, $1 ILIKE '%mano de obra%')
                  ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
                  RETURNING id, (xmax = 0) AS es_nueva`,
                 [item.familia]

@@ -86,7 +86,7 @@ export default async function catalogoRoutes(app) {
     const limite = request.query.todos === '1' ? 500 : 25;
 
     const { rows } = await pool.query(
-      `SELECT i.id, i.clave, i.descripcion, i.unidad, fi.nombre AS familia_nombre,
+      `SELECT i.id, i.clave, i.descripcion, i.unidad, fi.nombre AS familia_nombre, COALESCE(fi.es_mano_de_obra, false) AS es_mano_de_obra,
               s.cantidad_presupuestada, s.cantidad_aprobada_acumulada, s.saldo_disponible, s.costo_unitario, s.moneda
        FROM presupuesto_obra_insumo poi
        JOIN insumos i ON i.id = poi.insumo_id

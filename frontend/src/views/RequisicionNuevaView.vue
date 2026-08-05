@@ -202,11 +202,53 @@
 
     <p v-else-if="obraId" class="text-sm text-slate-400 mb-3">Agrega insumos con el buscador de arriba.</p>
 
+    <!-- Desglose de personal — solo aparece si hay algún insumo de la familia Mano de Obra -->
+    <div v-if="montoManoDeObra > 0" class="bg-white border border-slate-200 rounded-xl p-4 mb-3">
+      <h3 class="text-sm font-display mb-1">Personal asignado (Mano de Obra)</h3>
+      <p class="text-xs text-slate-500 mb-3">
+        Desglosa a quién se le paga qué de esta requisición — solo para control interno del gasto, no es un recibo de nómina.
+        La suma debe coincidir con el total de Mano de Obra: <b class="text-slate-700">{{ mxn(montoManoDeObra) }}</b>.
+      </p>
+
+      <div v-if="personal.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 mb-3">
+        <div v-for="(p, idx) in personal" :key="idx" class="flex items-center justify-between px-3 py-2 text-sm">
+          <span>{{ nombreTrabajador(p.trabajadorId) }}</span>
+          <div class="flex items-center gap-3">
+            <span class="tabular-nums font-semibold">{{ mxn(p.monto) }}</span>
+            <button class="text-slate-400 hover:text-danger" @click="personal.splice(idx, 1)">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-end gap-2 mb-2">
+        <div class="flex-1 min-w-[160px]">
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Trabajador</label>
+          <select v-model.number="nuevoPersonal.trabajadorId" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm">
+            <option :value="null" disabled>Elegir…</option>
+            <option v-for="t in trabajadoresDisponibles" :key="t.id" :value="t.id">{{ t.nombre }}{{ t.oficio ? ' · ' + t.oficio : '' }}</option>
+          </select>
+        </div>
+        <div class="w-32">
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Monto</label>
+          <input v-model.number="nuevoPersonal.monto" type="number" inputmode="decimal" min="0" step="any" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" />
+        </div>
+        <button type="button" class="min-h-[42px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm" :disabled="!nuevoPersonal.trabajadorId || !nuevoPersonal.monto" @click="agregarPersonal">
+          + Agregar
+        </button>
+        <RouterLink to="/trabajadores" class="text-xs text-slate-400 underline ml-auto">¿No está en la lista? Dar de alta</RouterLink>
+      </div>
+
+      <p class="text-xs font-semibold" :class="personalCuadra ? 'text-success' : 'text-danger'">
+        Asignado: {{ mxn(sumaPersonal) }} de {{ mxn(montoManoDeObra) }}
+        <span v-if="!personalCuadra && personal.length"> — no cuadra, faltan {{ mxn(montoManoDeObra - sumaPersonal) }}</span>
+      </p>
+    </div>
+
     <div class="flex gap-2.5">
-      <button class="min-h-[48px] border-[1.5px] border-slate-300 rounded-lg px-5 font-semibold text-sm" @click="guardar('borrador')" :disabled="!items.length || guardando">
+      <button class="min-h-[48px] border-[1.5px] border-slate-300 rounded-lg px-5 font-semibold text-sm" @click="guardar('borrador')" :disabled="!items.length || guardando || !personalListoParaGuardar">
         Guardar borrador
       </button>
-      <button class="min-h-[48px] bg-primary text-white rounded-lg px-5 font-bold text-sm" @click="guardar('enviar')" :disabled="!items.length || guardando">
+      <button class="min-h-[48px] bg-primary text-white rounded-lg px-5 font-bold text-sm" @click="guardar('enviar')" :disabled="!items.length || guardando || !personalListoParaGuardar">
         {{ guardando ? 'Guardando…' : 'Guardar y enviar a autorizar' }}
       </button>
     </div>
@@ -214,7 +256,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import { api } from '../lib/api.js';
@@ -274,7 +316,7 @@ async function cargarArbol() {
   obraId.value = data[0]?.id ?? null;
 }
 
-watch(obraId, () => { etapaId.value = etapas.value[0]?.id ?? null; items.value = []; catalogoInsumos.value = []; });
+watch(obraId, () => { etapaId.value = etapas.value[0]?.id ?? null; items.value = []; catalogoInsumos.value = []; personal.value = []; });
 watch(etapaId, () => { frenteId.value = frentes.value[0]?.id ?? null; });
 watch(frenteId, () => { partidaId.value = partidas.value[0]?.id ?? null; });
 
@@ -309,6 +351,8 @@ function agregarInsumo(s) {
     unidad: s.unidad,
     cantidadPresupuestada: Number(s.cantidad_presupuestada),
     saldoDisponible: Number(s.saldo_disponible),
+    costoUnitario: Number(s.costo_unitario ?? 0),
+    esManoDeObra: Boolean(s.es_mano_de_obra),
     cantidadRequerida: null,
     justificacion: '',
   });
@@ -320,6 +364,31 @@ function quitarInsumo(item) {
   items.value = items.value.filter((i) => i.insumoId !== item.insumoId);
 }
 
+// --- Personal asignado (Mano de Obra) ---
+const trabajadores = ref([]);
+const personal = ref([]);
+const nuevoPersonal = reactive({ trabajadorId: null, monto: null });
+
+const montoManoDeObra = computed(() =>
+  items.value.filter((i) => i.esManoDeObra).reduce((acc, i) => acc + Number(i.cantidadRequerida || 0) * i.costoUnitario, 0)
+);
+const sumaPersonal = computed(() => personal.value.reduce((acc, p) => acc + Number(p.monto || 0), 0));
+const personalCuadra = computed(() => Math.abs(sumaPersonal.value - montoManoDeObra.value) < 0.01);
+const personalListoParaGuardar = computed(() => montoManoDeObra.value <= 0 || personal.value.length === 0 || personalCuadra.value);
+const trabajadoresDisponibles = computed(() => trabajadores.value.filter((t) => !personal.value.some((p) => p.trabajadorId === t.id)));
+
+function mxn(n) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+}
+function nombreTrabajador(id) {
+  return trabajadores.value.find((t) => t.id === id)?.nombre ?? '—';
+}
+function agregarPersonal() {
+  personal.value.push({ trabajadorId: nuevoPersonal.trabajadorId, monto: nuevoPersonal.monto });
+  nuevoPersonal.trabajadorId = null;
+  nuevoPersonal.monto = null;
+}
+
 async function guardar(siguiente) {
   errorGeneral.value = '';
   const faltantes = items.value.filter((i) => excede(i) && !i.justificacion?.trim());
@@ -329,6 +398,10 @@ async function guardar(siguiente) {
   }
   if (items.value.some((i) => !i.cantidadRequerida || i.cantidadRequerida <= 0)) {
     errorGeneral.value = 'Captura una cantidad requerida mayor a cero en cada insumo.';
+    return;
+  }
+  if (montoManoDeObra.value > 0 && personal.value.length > 0 && !personalCuadra.value) {
+    errorGeneral.value = `El personal asignado (${mxn(sumaPersonal.value)}) no coincide con el total de Mano de Obra (${mxn(montoManoDeObra.value)}).`;
     return;
   }
 
@@ -343,6 +416,7 @@ async function guardar(siguiente) {
       cantidadRequerida: i.cantidadRequerida,
       justificacion: i.justificacion || null,
     })),
+    personal: personal.value,
   };
 
   try {
@@ -366,4 +440,5 @@ async function guardar(siguiente) {
 }
 
 cargarArbol();
+api.get('/trabajadores').then(({ data }) => { trabajadores.value = data; });
 </script>

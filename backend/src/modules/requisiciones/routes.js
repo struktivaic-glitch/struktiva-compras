@@ -44,17 +44,27 @@ async function cargarRequisicionCompleta(client, id) {
 
   const { rows: detalle } = await client.query(
     `SELECT rd.id, rd.insumo_id, rd.cantidad_requerida, rd.cantidad_aprobada, rd.excede_presupuesto, rd.justificacion,
-            i.clave, i.descripcion, i.unidad,
-            s.cantidad_presupuestada, s.saldo_disponible
+            i.clave, i.descripcion, i.unidad, COALESCE(fi.es_mano_de_obra, false) AS es_mano_de_obra,
+            s.cantidad_presupuestada, s.saldo_disponible, s.costo_unitario
      FROM requisicion_detalle rd
      JOIN insumos i ON i.id = rd.insumo_id
+     LEFT JOIN familias_insumo fi ON fi.id = i.familia_id
      JOIN vw_saldo_obra_insumo s ON s.obra_id = $2 AND s.insumo_id = rd.insumo_id
      WHERE rd.requisicion_id = $1
      ORDER BY rd.id`,
     [id, cab[0].obra_id]
   );
 
-  return { ...cab[0], detalle };
+  const { rows: personal } = await client.query(
+    `SELECT rp.id, rp.trabajador_id, rp.monto, t.nombre, t.oficio
+     FROM requisicion_personal rp
+     JOIN trabajadores t ON t.id = rp.trabajador_id
+     WHERE rp.requisicion_id = $1
+     ORDER BY t.nombre`,
+    [id]
+  );
+
+  return { ...cab[0], detalle, personal };
 }
 
 export default async function requisicionesRoutes(app) {
@@ -111,7 +121,7 @@ export default async function requisicionesRoutes(app) {
   });
 
   app.post('/api/requisiciones', async (request, reply) => {
-    const { obraId, etapaId, frenteId, partidaId, items } = request.body ?? {};
+    const { obraId, etapaId, frenteId, partidaId, items, personal } = request.body ?? {};
     if (!obraId || !etapaId || !frenteId || !partidaId || !Array.isArray(items) || items.length === 0) {
       return reply.code(400).send({ error: 'Obra, etapa, frente, partida y al menos un insumo son obligatorios' });
     }
@@ -119,17 +129,26 @@ export default async function requisicionesRoutes(app) {
     try {
       const resultado = await withTransaction(async (client) => {
         const { rows: saldos } = await client.query(
-          `SELECT insumo_id, saldo_disponible FROM vw_saldo_obra_insumo WHERE obra_id = $1`,
+          `SELECT s.insumo_id, s.saldo_disponible, s.costo_unitario, COALESCE(fi.es_mano_de_obra, false) AS es_mano_de_obra
+           FROM vw_saldo_obra_insumo s
+           JOIN insumos i ON i.id = s.insumo_id
+           LEFT JOIN familias_insumo fi ON fi.id = i.familia_id
+           WHERE s.obra_id = $1`,
           [obraId]
         );
-        const saldoPorInsumo = new Map(saldos.map((s) => [s.insumo_id, Number(s.saldo_disponible)]));
+        const saldoPorInsumo = new Map(saldos.map((s) => [s.insumo_id, s]));
 
         const erroresJustificacion = [];
+        let montoManoDeObra = 0;
         const itemsValidados = items.map((item) => {
-          const saldo = saldoPorInsumo.get(item.insumoId) ?? 0;
+          const info = saldoPorInsumo.get(item.insumoId);
+          const saldo = Number(info?.saldo_disponible ?? 0);
           const excede = Number(item.cantidadRequerida) > saldo;
           if (excede && !item.justificacion?.trim()) {
             erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
+          }
+          if (info?.es_mano_de_obra) {
+            montoManoDeObra += Number(item.cantidadRequerida) * Number(info.costo_unitario ?? 0);
           }
           return { ...item, excede };
         });
@@ -138,6 +157,20 @@ export default async function requisicionesRoutes(app) {
           const err = new Error('EXCEDE_SIN_JUSTIFICACION');
           err.detalle = erroresJustificacion;
           throw err;
+        }
+
+        const personalValidado = Array.isArray(personal) ? personal.filter((p) => p.trabajadorId && Number(p.monto) > 0) : [];
+        if (personalValidado.length > 0) {
+          if (montoManoDeObra <= 0) {
+            throw Object.assign(new Error('PERSONAL_SIN_MANO_DE_OBRA'), { code: 422 });
+          }
+          const sumaPersonal = personalValidado.reduce((acc, p) => acc + Number(p.monto), 0);
+          if (Math.abs(sumaPersonal - montoManoDeObra) > 0.01) {
+            throw Object.assign(new Error('PERSONAL_NO_CUADRA'), {
+              code: 422,
+              detalle: { sumaPersonal, montoManoDeObra },
+            });
+          }
         }
 
         const folio = await siguienteFolio(client, 'REQ', 'requisiciones_folio_seq');
@@ -156,12 +189,19 @@ export default async function requisicionesRoutes(app) {
           );
         }
 
+        for (const p of personalValidado) {
+          await client.query(
+            `INSERT INTO requisicion_personal (requisicion_id, trabajador_id, monto) VALUES ($1, $2, $3)`,
+            [requisicionId, p.trabajadorId, p.monto]
+          );
+        }
+
         await registrarBitacora(client, {
           tabla: 'requisiciones',
           registroId: requisicionId,
           usuarioId: request.user.sub,
           accion: 'crear',
-          despues: { folio, estatus: 'borrador', items: itemsValidados },
+          despues: { folio, estatus: 'borrador', items: itemsValidados, personal: personalValidado },
         });
 
         return cargarRequisicionCompleta(client, requisicionId);
@@ -172,6 +212,15 @@ export default async function requisicionesRoutes(app) {
       if (err.message === 'EXCEDE_SIN_JUSTIFICACION') {
         return reply.code(422).send({
           error: 'Uno o más insumos exceden el saldo disponible y requieren justificación técnica',
+          detalle: err.detalle,
+        });
+      }
+      if (err.message === 'PERSONAL_SIN_MANO_DE_OBRA') {
+        return reply.code(422).send({ error: 'Agrega un insumo de la familia Mano de Obra antes de asignar personal.' });
+      }
+      if (err.message === 'PERSONAL_NO_CUADRA') {
+        return reply.code(422).send({
+          error: `La suma del personal asignado (${err.detalle.sumaPersonal.toFixed(2)}) no coincide con el total de Mano de Obra de la requisición (${err.detalle.montoManoDeObra.toFixed(2)}).`,
           detalle: err.detalle,
         });
       }
