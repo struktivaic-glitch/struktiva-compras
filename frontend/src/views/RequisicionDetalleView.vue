@@ -39,6 +39,8 @@
               <th class="text-left px-4 py-2.5 font-normal font-sans">Insumo</th>
               <th class="text-left px-4 py-2.5 font-normal font-sans">Cant. requerida</th>
               <th class="text-left px-4 py-2.5 font-normal font-sans">Cant. aprobada</th>
+              <th class="text-left px-4 py-2.5 font-normal font-sans">P.U.</th>
+              <th class="text-left px-4 py-2.5 font-normal font-sans">Total sugerido</th>
               <th class="text-left px-4 py-2.5 font-normal font-sans">Saldo disponible</th>
               <th class="text-left px-4 py-2.5 font-normal font-sans">Estado</th>
             </tr>
@@ -49,6 +51,8 @@
                 <td class="px-4 py-2.5 font-sans font-semibold">{{ d.clave }} · {{ d.descripcion }}</td>
                 <td class="px-4 py-2.5">{{ d.cantidad_requerida }} {{ d.unidad }}</td>
                 <td class="px-4 py-2.5">{{ d.cantidad_aprobada != null ? `${d.cantidad_aprobada} ${d.unidad}` : '—' }}</td>
+                <td class="px-4 py-2.5">{{ d.precio_unitario != null ? mxn(d.precio_unitario) : '—' }}</td>
+                <td class="px-4 py-2.5 font-semibold">{{ mxn(d.total_sugerido) }}</td>
                 <td class="px-4 py-2.5">{{ d.saldo_disponible }} {{ d.unidad }}</td>
                 <td class="px-4 py-2.5">
                   <span v-if="d.excede_presupuesto" class="text-[11px] font-bold text-danger">Excede</span>
@@ -56,10 +60,18 @@
                 </td>
               </tr>
               <tr v-if="d.excede_presupuesto && d.justificacion" class="border-t border-slate-100 bg-red-50/40">
-                <td colspan="5" class="px-4 py-2 text-xs text-slate-600 font-sans"><b>Justificación:</b> {{ d.justificacion }}</td>
+                <td colspan="7" class="px-4 py-2 text-xs text-slate-600 font-sans"><b>Justificación:</b> {{ d.justificacion }}</td>
               </tr>
             </template>
           </tbody>
+          <tfoot>
+            <tr class="border-t border-slate-300 font-bold">
+              <td class="px-4 py-2.5 font-sans" colspan="4">Total sugerido de la requisición</td>
+              <td class="px-4 py-2.5">{{ mxn(totalRequisicion) }}</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
 
         <template v-if="req.personal?.length">
@@ -152,6 +164,7 @@ function imprimir() {
 
 const hayExcedente = computed(() => (req.value?.detalle ?? []).some((d) => d.excede_presupuesto));
 const totalPersonal = computed(() => (req.value?.personal ?? []).reduce((acc, p) => acc + Number(p.monto), 0));
+const totalRequisicion = computed(() => (req.value?.detalle ?? []).reduce((acc, d) => acc + Number(d.total_sugerido ?? 0), 0));
 function mxn(n) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 }

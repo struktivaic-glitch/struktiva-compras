@@ -143,6 +143,8 @@
             <th class="text-left px-4 py-2.5 font-normal">Presupuestado</th>
             <th class="text-left px-4 py-2.5 font-normal">Disponible</th>
             <th class="text-left px-4 py-2.5 font-normal">Cant. requerida</th>
+            <th class="text-left px-4 py-2.5 font-normal">P.U.</th>
+            <th class="text-left px-4 py-2.5 font-normal">Total sugerido</th>
             <th class="text-left px-4 py-2.5 font-normal">Estado</th>
             <th></th>
           </tr>
@@ -158,6 +160,10 @@
               <td class="px-4 py-2.5">
                 <input v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
               </td>
+              <td class="px-4 py-2.5">
+                <input v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
+              </td>
+              <td class="px-4 py-2.5 font-semibold">{{ mxn(totalSugerido(item)) }}</td>
               <td class="px-4 py-2.5 font-sans">
                 <span v-if="excede(item)" class="text-[11.5px] font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-danger">Excede</span>
                 <span v-else class="text-[11.5px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-success">OK</span>
@@ -165,7 +171,7 @@
               <td class="px-4 py-2.5 font-sans"><button class="text-slate-400 hover:text-danger" @click="quitarInsumo(item)">✕</button></td>
             </tr>
             <tr v-if="excede(item)" class="border-t border-danger/20">
-              <td colspan="8" class="px-4 py-3 bg-red-50">
+              <td colspan="10" class="px-4 py-3 bg-red-50">
                 <label class="block text-[11.5px] font-bold text-danger mb-1">
                   Justificación técnica obligatoria — {{ item.descripcion }} excede saldo disponible por {{ (item.cantidadRequerida - item.saldoDisponible).toFixed(2) }} {{ item.unidad }}
                 </label>
@@ -192,6 +198,11 @@
           <label class="text-xs text-slate-500 flex-none">Cant.</label>
           <input v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
         </div>
+        <div class="flex items-center gap-2.5 mt-2.5">
+          <label class="text-xs text-slate-500 flex-none">P.U.</label>
+          <input v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
+        </div>
+        <div class="flex justify-between text-[12.5px] text-slate-500 py-0.5 mt-2"><span>Total sugerido</span><b class="text-slate-800">{{ mxn(totalSugerido(item)) }}</b></div>
         <div v-if="excede(item)" class="mt-2.5 bg-red-50 border border-dashed border-danger rounded-md px-2.5 py-2">
           <label class="text-[11px] font-bold text-danger block mb-1">Justificación técnica obligatoria</label>
           <textarea v-model="item.justificacion" rows="2" class="w-full border border-danger rounded-md px-2.5 py-1.5 text-sm" placeholder="Describe el motivo del excedente…" />
@@ -370,6 +381,9 @@ function agregarInsumo(s) {
     cantidadPresupuestada: Number(s.cantidad_presupuestada),
     saldoDisponible: Number(s.saldo_disponible),
     costoUnitario: Number(s.costo_unitario ?? 0),
+    // El P.U. se precarga con el del presupuesto (referencia útil) pero es editable — el total
+    // sugerido de esta requisición se calcula con el P.U. que quede aquí, no el del presupuesto.
+    precioUnitario: Number(s.costo_unitario ?? 0) || null,
     esManoDeObra: Boolean(s.es_mano_de_obra),
     cantidadRequerida: null,
     justificacion: '',
@@ -380,6 +394,10 @@ function agregarInsumo(s) {
 
 function quitarInsumo(item) {
   items.value = items.value.filter((i) => i.insumoId !== item.insumoId);
+}
+
+function totalSugerido(item) {
+  return Number(item.cantidadRequerida || 0) * Number(item.precioUnitario || 0);
 }
 
 // --- Personal asignado (Mano de Obra) ---
@@ -408,8 +426,10 @@ async function darDeAltaTrabajador() {
   }
 }
 
+// El objetivo a cuadrar con Personal asignado usa el P.U. capturado en ESTA requisición, no el
+// costo del presupuesto — así no se mezclan jornales con un monto calculado aparte y a ciegas.
 const montoManoDeObra = computed(() =>
-  items.value.filter((i) => i.esManoDeObra).reduce((acc, i) => acc + Number(i.cantidadRequerida || 0) * i.costoUnitario, 0)
+  items.value.filter((i) => i.esManoDeObra).reduce((acc, i) => acc + totalSugerido(i), 0)
 );
 const sumaPersonal = computed(() => personal.value.reduce((acc, p) => acc + Number(p.monto || 0), 0));
 const personalCuadra = computed(() => Math.abs(sumaPersonal.value - montoManoDeObra.value) < 0.01);
@@ -439,6 +459,10 @@ async function guardar(siguiente) {
     errorGeneral.value = 'Captura una cantidad requerida mayor a cero en cada insumo.';
     return;
   }
+  if (items.value.some((i) => !i.precioUnitario || i.precioUnitario <= 0)) {
+    errorGeneral.value = 'Captura un precio unitario mayor a cero en cada insumo.';
+    return;
+  }
   if (montoManoDeObra.value > 0 && personal.value.length > 0 && !personalCuadra.value) {
     errorGeneral.value = `El personal asignado (${mxn(sumaPersonal.value)}) no coincide con el total de Mano de Obra (${mxn(montoManoDeObra.value)}).`;
     return;
@@ -453,6 +477,7 @@ async function guardar(siguiente) {
     items: items.value.map((i) => ({
       insumoId: i.insumoId,
       cantidadRequerida: i.cantidadRequerida,
+      precioUnitario: i.precioUnitario,
       justificacion: i.justificacion || null,
     })),
     personal: personal.value,

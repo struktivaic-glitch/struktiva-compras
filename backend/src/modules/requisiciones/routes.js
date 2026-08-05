@@ -15,12 +15,17 @@ function formatoRequisicionTelegram(req, encabezado) {
   const hayExcedente = req.detalle.some((d) => d.excede_presupuesto);
   if (hayExcedente) lineas.push('⚠️ Incluye insumos que exceden el saldo disponible');
   lineas.push('', 'Insumos:');
+  let totalGeneral = 0;
   for (const d of req.detalle) {
     const cantidad = Number(d.cantidad_requerida).toLocaleString('es-MX');
     const marca = d.excede_presupuesto ? ' ⚠️ excede' : '';
-    lineas.push(`• ${d.descripcion} — ${cantidad} ${d.unidad}${marca}`);
+    const total = Number(d.total_sugerido ?? 0);
+    totalGeneral += total;
+    const pu = d.precio_unitario != null ? ` · P.U. $${Number(d.precio_unitario).toLocaleString('es-MX')} · Total $${total.toLocaleString('es-MX')}` : '';
+    lineas.push(`• ${d.descripcion} — ${cantidad} ${d.unidad}${marca}${pu}`);
     if (d.excede_presupuesto && d.justificacion) lineas.push(`   Justificación: ${d.justificacion}`);
   }
+  if (req.detalle.some((d) => d.precio_unitario != null)) lineas.push(`Total sugerido: $${totalGeneral.toLocaleString('es-MX')}`);
   lineas.push('', `Ver y autorizar: ${env.corsOrigin}/requisiciones`);
   return lineas.join('\n');
 }
@@ -44,6 +49,7 @@ async function cargarRequisicionCompleta(client, id) {
 
   const { rows: detalle } = await client.query(
     `SELECT rd.id, rd.insumo_id, rd.cantidad_requerida, rd.cantidad_aprobada, rd.excede_presupuesto, rd.justificacion,
+            rd.precio_unitario, (rd.cantidad_requerida * COALESCE(rd.precio_unitario, s.costo_unitario)) AS total_sugerido,
             i.clave, i.descripcion, i.unidad, COALESCE(fi.es_mano_de_obra, false) AS es_mano_de_obra,
             s.cantidad_presupuestada, s.saldo_disponible, s.costo_unitario
      FROM requisicion_detalle rd
@@ -139,6 +145,7 @@ export default async function requisicionesRoutes(app) {
         const saldoPorInsumo = new Map(saldos.map((s) => [s.insumo_id, s]));
 
         const erroresJustificacion = [];
+        const erroresPrecio = [];
         let montoManoDeObra = 0;
         const itemsValidados = items.map((item) => {
           const info = saldoPorInsumo.get(item.insumoId);
@@ -147,11 +154,19 @@ export default async function requisicionesRoutes(app) {
           if (excede && !item.justificacion?.trim()) {
             erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
           }
+          // El P.U. lo captura quien pide la requisición (visible desde el inicio, no un cálculo
+          // oculto contra el presupuesto) — solo caemos al costo presupuestado si no mandaron nada.
+          const precioUnitario = item.precioUnitario != null && item.precioUnitario !== '' ? Number(item.precioUnitario) : Number(info?.costo_unitario ?? 0);
+          if (!(precioUnitario > 0)) erroresPrecio.push(item.insumoId);
           if (info?.es_mano_de_obra) {
-            montoManoDeObra += Number(item.cantidadRequerida) * Number(info.costo_unitario ?? 0);
+            montoManoDeObra += Number(item.cantidadRequerida) * precioUnitario;
           }
-          return { ...item, excede };
+          return { ...item, excede, precioUnitario };
         });
+
+        if (erroresPrecio.length > 0) {
+          throw Object.assign(new Error('PRECIO_UNITARIO_REQUERIDO'), { code: 400 });
+        }
 
         if (erroresJustificacion.length > 0) {
           const err = new Error('EXCEDE_SIN_JUSTIFICACION');
@@ -183,9 +198,9 @@ export default async function requisicionesRoutes(app) {
 
         for (const item of itemsValidados) {
           await client.query(
-            `INSERT INTO requisicion_detalle (requisicion_id, insumo_id, cantidad_requerida, excede_presupuesto, justificacion)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [requisicionId, item.insumoId, item.cantidadRequerida, item.excede, item.justificacion ?? null]
+            `INSERT INTO requisicion_detalle (requisicion_id, insumo_id, cantidad_requerida, excede_presupuesto, justificacion, precio_unitario)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [requisicionId, item.insumoId, item.cantidadRequerida, item.excede, item.justificacion ?? null, item.precioUnitario]
           );
         }
 
@@ -214,6 +229,9 @@ export default async function requisicionesRoutes(app) {
           error: 'Uno o más insumos exceden el saldo disponible y requieren justificación técnica',
           detalle: err.detalle,
         });
+      }
+      if (err.message === 'PRECIO_UNITARIO_REQUERIDO') {
+        return reply.code(400).send({ error: 'Captura un precio unitario mayor a cero en cada insumo.' });
       }
       if (err.message === 'PERSONAL_SIN_MANO_DE_OBRA') {
         return reply.code(422).send({ error: 'Agrega un insumo de la familia Mano de Obra antes de asignar personal.' });
