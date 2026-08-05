@@ -19,17 +19,33 @@
       </div>
     </header>
 
-    <nav class="bg-white border-b border-slate-200 no-print">
-      <div class="max-w-6xl mx-auto px-5 flex gap-1 overflow-x-auto">
-        <RouterLink
-          v-for="item in navVisible"
-          :key="item.to"
-          :to="item.to"
-          class="px-4 py-3 text-[13.5px] font-semibold text-slate-500 border-b-[2.5px] border-transparent flex-none whitespace-nowrap"
-          active-class="!text-primary !border-brand-red"
+    <nav class="bg-white border-b border-slate-200 no-print relative" ref="navRef">
+      <div class="max-w-6xl mx-auto px-5">
+        <button
+          class="w-full flex items-center justify-between gap-3 py-3 text-[14px] font-bold text-slate-700"
+          @click="menuAbierto = !menuAbierto"
         >
-          {{ item.label }}
-        </RouterLink>
+          <span class="flex items-center gap-2">
+            <span class="text-[18px] leading-none">☰</span>
+            Menú
+          </span>
+          <span class="text-[13px] font-semibold text-primary truncate">{{ paginaActual }}</span>
+        </button>
+      </div>
+
+      <div v-if="menuAbierto" class="absolute left-0 right-0 bg-white border-b border-slate-200 shadow-lg z-40 max-h-[70vh] overflow-y-auto">
+        <div class="max-w-6xl mx-auto px-5 py-2 flex flex-col">
+          <RouterLink
+            v-for="item in navVisible"
+            :key="item.to"
+            :to="item.to"
+            class="px-2 py-3 text-[14px] font-semibold text-slate-600 border-b border-slate-100 last:border-b-0"
+            active-class="!text-primary"
+            @click="menuAbierto = false"
+          >
+            {{ item.label }}
+          </RouterLink>
+        </div>
       </div>
     </nav>
 
@@ -40,14 +56,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import BrandMark from './BrandMark.vue';
 import NotificacionesBell from './NotificacionesBell.vue';
 import { useAuthStore } from '../stores/auth.js';
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+const menuAbierto = ref(false);
+const navRef = ref(null);
 
 const nav = [
   { to: '/', label: 'Dashboard' },
@@ -66,6 +85,19 @@ const nav = [
 ];
 
 const navVisible = computed(() => nav.filter((item) => !item.roles || item.roles.includes(auth.rol)));
+const paginaActual = computed(() => navVisible.value.find((item) => item.to === route.path)?.label ?? '');
+
+watch(() => route.path, () => {
+  menuAbierto.value = false;
+});
+
+function alHacerClicFuera(ev) {
+  if (menuAbierto.value && navRef.value && !navRef.value.contains(ev.target)) {
+    menuAbierto.value = false;
+  }
+}
+onMounted(() => document.addEventListener('click', alHacerClicFuera));
+onBeforeUnmount(() => document.removeEventListener('click', alHacerClicFuera));
 
 const iniciales = computed(() =>
   (auth.usuario?.nombre ?? '')
