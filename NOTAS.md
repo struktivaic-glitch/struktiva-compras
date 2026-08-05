@@ -244,3 +244,32 @@ cd frontend && npm run dev # http://localhost:5173
     excedente → Superintendente la ve en la campanita → autoriza con PIN → Dirección recibe el
     aviso cruzado de excedente → se cancela → Auditor recibe el aviso de cancelación. Los tres
     flujos verificados también ya desplegados en Render (no solo en local).
+- **Bloques 16-22** (04-05/08/2026): serie de ajustes rápidos pedidos mientras el usuario probaba
+  el sistema en vivo — cada uno confirmado en producción antes de pasar al siguiente: pivote de
+  WhatsApp a Telegram para notificaciones (Meta bloqueó la cuenta personal por "acceso
+  restringido a publicidad", sin nada que apelar — Telegram evita ese problema por completo;
+  vinculación self-service desde `/perfil` vía webhook, mensajes enriquecidos con el detalle
+  completo de la requisición); logo con sombra blanca de contraste + barra de título 50% más
+  grande; menú de navegación convertido de barra horizontal a botón "☰ Menú" desplegable; vista
+  de consulta para Requisiciones individuales (antes solo existía para Cotizaciones/OC) con el
+  mismo candado de permisos (solo quien la creó o Dirección puede enviarla/cancelarla — antes
+  cualquier usuario autenticado podía); impresión (mismo patrón de los 6 reportes) agregada a
+  Requisición individual, Orden de Compra y cuadro comparativo de Cotización; modal "Ver catálogo
+  completo" en Nueva Requisición (todos los insumos de la obra agrupados por familia, con
+  filtro) para cuando no se conoce la clave/descripción exacta a buscar.
+- **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
+  interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
+  el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo
+  específico) pero su suma debe cuadrar exacto con el total de Mano de Obra de la requisición;
+  catálogo reutilizable de trabajadores (como Proveedores), no texto libre cada vez. Detalles
+  técnicos: se agregó una bandera explícita `es_mano_de_obra` a `familias_insumo` en vez de
+  comparar el nombre por texto (los nombres de familia vienen libres de cada exportación de
+  Neodata) — el importador de Excel la detecta sola al crear una familia nueva, sin pisarla si
+  ya fue ajustada a mano. Nuevo catálogo `/trabajadores` (Residente/Superintendente/Dirección).
+  La validación de que la suma cuadre corre en el servidor (con tolerancia de 1 centavo) y
+  también en el cliente antes de enviar, para un error más rápido. El desglose aparece también
+  en la consulta e impresión de la Requisición. Se agregó la familia "Mano de Obra" con un
+  insumo de ejemplo ("Peón", $350/jornal) a la obra demo Horizontes para poder probar de
+  inmediato. Probado de punta a punta en producción: 20 jornales × $350 = $7,000 repartidos
+  entre 2 trabajadores ($3,500 c/u) — guardó, se mostró correcto en consulta e impresión; caso
+  con suma incorrecta ($5,000 en vez de $7,000) rechazado con error claro antes de guardar.
