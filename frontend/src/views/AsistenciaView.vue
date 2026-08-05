@@ -190,7 +190,10 @@ function formatoHora(fechaIso) {
   return new Date(fechaIso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 }
 function formatoFecha(fechaIso) {
-  return new Date(fechaIso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  // `fecha` es una columna DATE (sin hora) — el backend la sirve como medianoche UTC. Si se
+  // formatea en la zona horaria local del navegador, puede "retroceder" un día (ej. Hermosillo,
+  // UTC-7). Se fuerza timeZone: 'UTC' para mostrar el día calendario tal como está guardado.
+  return new Date(fechaIso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 function horasTrabajadas(a) {
   if (!a.hora_entrada || !a.hora_salida) return '—';
