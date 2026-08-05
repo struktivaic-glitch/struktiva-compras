@@ -32,7 +32,7 @@
           @click="grupoAbierto = grupoAbierto === g.clave ? null : g.clave"
         >
           <span class="text-[16px] leading-none">{{ g.icono }}</span>
-          Menú {{ g.label }}
+          {{ g.label }}
           <span class="text-[10px]">▾</span>
         </button>
       </div>
