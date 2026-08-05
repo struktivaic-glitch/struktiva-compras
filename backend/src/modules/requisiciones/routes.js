@@ -87,7 +87,7 @@ export default async function requisicionesRoutes(app) {
 
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const { rows } = await pool.query(
-      `SELECT r.id, r.folio, r.estatus, r.creado_en,
+      `SELECT r.id, r.folio, r.estatus, r.creado_en, r.usuario_solicitante_id,
               o.nombre AS obra_nombre, f.nombre AS frente_nombre, p.nombre AS partida_nombre,
               us.nombre AS solicitante_nombre,
               (SELECT COUNT(*) FROM requisicion_detalle rd WHERE rd.requisicion_id = r.id AND rd.excede_presupuesto) AS renglones_excedidos
@@ -186,6 +186,9 @@ export default async function requisicionesRoutes(app) {
       const { rows } = await client.query('SELECT estatus, folio, usuario_solicitante_id FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
       const req = rows[0];
       if (!req) return { error: 404 };
+      if (req.usuario_solicitante_id !== request.user.sub && request.user.rol !== 'direccion') {
+        return { error: 403, mensaje: 'Solo quien creó la requisición o Dirección puede enviarla a autorizar' };
+      }
       if (req.estatus !== 'borrador') return { error: 409, mensaje: 'Solo un borrador puede enviarse a autorización' };
 
       await client.query("UPDATE requisiciones SET estatus = 'pendiente_autorizacion', actualizado_en = now() WHERE id = $1", [id]);
@@ -206,6 +209,7 @@ export default async function requisicionesRoutes(app) {
     });
 
     if (resultado.error === 404) return reply.code(404).send({ error: 'Requisición no encontrada' });
+    if (resultado.error === 403) return reply.code(403).send({ error: resultado.mensaje });
     if (resultado.error === 409) return reply.code(409).send({ error: resultado.mensaje });
     return cargarRequisicionCompleta(pool, id);
   });
@@ -275,9 +279,12 @@ export default async function requisicionesRoutes(app) {
   app.post('/api/requisiciones/:id/cancelar', async (request, reply) => {
     const { id } = request.params;
     const resultado = await withTransaction(async (client) => {
-      const { rows } = await client.query('SELECT estatus, folio FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
+      const { rows } = await client.query('SELECT estatus, folio, usuario_solicitante_id FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
       const req = rows[0];
       if (!req) return { error: 404 };
+      if (req.usuario_solicitante_id !== request.user.sub && request.user.rol !== 'direccion') {
+        return { error: 403, mensaje: 'Solo quien creó la requisición o Dirección puede cancelarla' };
+      }
       if (['atendida_parcial', 'atendida_total', 'cancelada'].includes(req.estatus)) {
         return { error: 409, mensaje: 'Esta requisición ya no puede cancelarse' };
       }
@@ -299,6 +306,7 @@ export default async function requisicionesRoutes(app) {
     });
 
     if (resultado.error === 404) return reply.code(404).send({ error: 'Requisición no encontrada' });
+    if (resultado.error === 403) return reply.code(403).send({ error: resultado.mensaje });
     if (resultado.error === 409) return reply.code(409).send({ error: resultado.mensaje });
     return cargarRequisicionCompleta(pool, id);
   });

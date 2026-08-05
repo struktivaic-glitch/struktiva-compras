@@ -6,6 +6,7 @@ const routes = [
   { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { requiresAuth: true } },
   { path: '/requisiciones', name: 'requisiciones', component: () => import('../views/RequisicionesListView.vue'), meta: { requiresAuth: true } },
   { path: '/requisiciones/nueva', name: 'requisicion-nueva', component: () => import('../views/RequisicionNuevaView.vue'), meta: { requiresAuth: true } },
+  { path: '/requisiciones/:id', name: 'requisicion-detalle', component: () => import('../views/RequisicionDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/proveedores', name: 'proveedores', component: () => import('../views/ProveedoresView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones', name: 'cotizaciones', component: () => import('../views/CotizacionesListView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones/nueva', name: 'cotizacion-nueva', component: () => import('../views/CotizacionNuevaView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },

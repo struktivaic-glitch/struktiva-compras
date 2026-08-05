@@ -1,14 +1,14 @@
 <template>
   <div class="relative">
     <button
-      class="relative w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20"
+      class="relative w-[54px] h-[54px] rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20"
       title="Notificaciones"
       @click="abierto = !abierto"
     >
-      <span class="text-base leading-none">🔔</span>
+      <span class="text-[24px] leading-none">🔔</span>
       <span
         v-if="resumen.totalNoLeidas > 0"
-        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-red text-white text-[10px] font-bold flex items-center justify-center"
+        class="absolute -top-1 -right-1 min-w-[27px] h-[27px] px-1 rounded-full bg-brand-red text-white text-[15px] font-bold flex items-center justify-center"
       >
         {{ resumen.totalNoLeidas > 99 ? '99+' : resumen.totalNoLeidas }}
       </span>

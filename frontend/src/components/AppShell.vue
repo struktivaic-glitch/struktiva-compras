@@ -1,20 +1,20 @@
 <template>
   <div class="min-h-screen bg-slate-100">
     <header class="bg-primary text-white border-b-[3px] border-brand-red no-print">
-      <div class="max-w-6xl mx-auto px-5 py-3 flex items-center gap-4 flex-wrap">
-        <BrandMark :size="34" />
+      <div class="max-w-6xl mx-auto px-[30px] py-[18px] flex items-center gap-[24px] flex-wrap">
+        <BrandMark :size="51" />
         <div class="mr-auto leading-tight">
-          <b class="font-display text-[17px] tracking-wide">STRUKTIVA</b>
-          <div class="text-[11px] text-sky-100/80">Control de Compras y Requisiciones · Obra</div>
+          <b class="font-display text-[26px] tracking-wide">STRUKTIVA</b>
+          <div class="text-[17px] text-sky-100/80">Control de Compras y Requisiciones · Obra</div>
         </div>
         <NotificacionesBell />
-        <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full pl-1 pr-3 py-1 text-xs">
-          <span class="w-6 h-6 rounded-full bg-accent text-[#06282a] font-bold flex items-center justify-center text-[11px]">
+        <div class="flex items-center gap-[12px] bg-white/10 border border-white/20 rounded-full pl-[6px] pr-[18px] py-[6px] text-[18px]">
+          <span class="w-9 h-9 rounded-full bg-accent text-[#06282a] font-bold flex items-center justify-center text-[17px]">
             {{ iniciales }}
           </span>
           <span>{{ auth.usuario?.nombre }} · {{ auth.usuario?.rolNombre }}</span>
-          <RouterLink to="/perfil" class="ml-2 underline decoration-white/40 hover:decoration-white">Perfil</RouterLink>
-          <button class="ml-2 underline decoration-white/40 hover:decoration-white" @click="salir">Salir</button>
+          <RouterLink to="/perfil" class="ml-3 underline decoration-white/40 hover:decoration-white">Perfil</RouterLink>
+          <button class="ml-3 underline decoration-white/40 hover:decoration-white" @click="salir">Salir</button>
         </div>
       </div>
     </header>

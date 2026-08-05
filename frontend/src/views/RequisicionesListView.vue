@@ -36,7 +36,7 @@
         <tbody>
           <tr v-for="r in requisiciones" :key="r.id" class="border-t border-slate-200">
             <td class="px-4 py-2.5 font-semibold tabular-nums">
-              {{ r.folio }}
+              <RouterLink :to="`/requisiciones/${r.id}`" class="text-primary underline decoration-primary/30 hover:decoration-primary">{{ r.folio }}</RouterLink>
               <span v-if="r.renglones_excedidos > 0" class="ml-1.5 text-[10px] font-bold text-danger">● excede</span>
             </td>
             <td class="px-4 py-2.5">{{ r.obra_nombre }} / {{ r.frente_nombre }} / {{ r.partida_nombre }}</td>
@@ -47,9 +47,10 @@
               </span>
             </td>
             <td class="px-4 py-2.5 space-x-2">
+              <RouterLink :to="`/requisiciones/${r.id}`" class="text-xs font-semibold text-primary underline">Consultar</RouterLink>
               <RouterLink :to="`/expediente/${r.id}`" class="text-xs font-semibold text-slate-500 underline">Expediente</RouterLink>
               <button
-                v-if="r.estatus === 'borrador'"
+                v-if="r.estatus === 'borrador' && puedeModificar(r)"
                 class="text-xs font-semibold text-primary underline"
                 @click="accion(r, 'enviar')"
               >
@@ -63,7 +64,7 @@
                 Autorizar
               </button>
               <button
-                v-if="!['atendida_parcial', 'atendida_total', 'cancelada'].includes(r.estatus)"
+                v-if="!['atendida_parcial', 'atendida_total', 'cancelada'].includes(r.estatus) && puedeModificar(r)"
                 class="text-xs font-semibold text-danger underline"
                 @click="accion(r, 'cancelar')"
               >
@@ -97,6 +98,9 @@ const error = ref('');
 const filtroEstatus = ref('');
 
 const puedeAutorizar = computed(() => ['superintendente', 'direccion'].includes(auth.rol));
+function puedeModificar(r) {
+  return r.usuario_solicitante_id === auth.usuario?.id || auth.rol === 'direccion';
+}
 
 const ESTATUS_TEXTO = {
   borrador: 'Borrador',
