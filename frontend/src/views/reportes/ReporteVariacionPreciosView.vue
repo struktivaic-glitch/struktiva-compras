@@ -6,7 +6,7 @@
         <select v-model.number="obraId" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2">
           <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
@@ -54,6 +54,7 @@ const obraId = ref(null);
 const lineas = ref([]);
 
 function mxn(n) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0); }
+function imprimir() { window.print(); }
 const obraNombre = computed(() => obras.value.find((o) => o.id === obraId.value)?.nombre ?? '');
 
 async function cargar() {

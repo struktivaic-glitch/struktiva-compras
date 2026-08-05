@@ -2,6 +2,7 @@
   <AppShell>
     <div v-if="!req" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
+      <BotonVolver fallback="/requisiciones" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
           <h2 class="font-display text-lg">
@@ -20,7 +21,7 @@
           <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="estatusClase(req.estatus)">
             {{ estatusTexto(req.estatus) }}
           </span>
-          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
         </div>
       </div>
 
@@ -131,6 +132,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import BotonVolver from '../components/BotonVolver.vue';
 import FirmaModal from '../components/FirmaModal.vue';
 import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
@@ -143,6 +145,10 @@ const error = ref('');
 const mensaje = ref('');
 const mostrarFirma = ref(false);
 const firmaModalRef = ref(null);
+
+function imprimir() {
+  window.print();
+}
 
 const hayExcedente = computed(() => (req.value?.detalle ?? []).some((d) => d.excede_presupuesto));
 const totalPersonal = computed(() => (req.value?.personal ?? []).reduce((acc, p) => acc + Number(p.monto), 0));

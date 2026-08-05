@@ -2,6 +2,7 @@
   <AppShell>
     <div v-if="!proceso" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
+      <BotonVolver fallback="/cotizaciones" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
           <h2 class="font-display text-lg">{{ proceso.folio }}</h2>
@@ -13,7 +14,7 @@
           <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="proceso.estatus === 'cerrado' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
             {{ proceso.estatus === 'cerrado' ? 'Cerrado' : 'En cotización' }}
           </span>
-          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
         </div>
       </div>
 
@@ -126,6 +127,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import BotonVolver from '../components/BotonVolver.vue';
 import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
@@ -146,6 +148,10 @@ const precios = reactive({});
 
 function mxn(n) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+}
+
+function imprimir() {
+  window.print();
 }
 
 const proveedoresDisponibles = computed(() => {

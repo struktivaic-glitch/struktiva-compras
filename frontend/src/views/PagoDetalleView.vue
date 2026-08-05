@@ -2,6 +2,7 @@
   <AppShell>
     <div v-if="!pago" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
+      <BotonVolver fallback="/pagos" />
       <h2 class="font-display text-lg mb-1">{{ pago.folio }}</h2>
       <p class="text-xs text-slate-500 mb-5">
         {{ pago.proveedor_nombre }} · {{ pago.forma_pago }} · {{ pago.referencia || 'sin referencia' }} ·
@@ -41,6 +42,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
 
 const route = useRoute();

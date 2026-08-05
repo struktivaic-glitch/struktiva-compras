@@ -12,7 +12,7 @@
           <option value="atendida_total">Atendida total</option>
           <option value="cancelada">Cancelada</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
@@ -55,6 +55,7 @@ const ESTATUS_TEXTO = {
   atendida_parcial: 'Atendida parcial', atendida_total: 'Atendida total', cancelada: 'Cancelada',
 };
 function estatusTexto(e) { return ESTATUS_TEXTO[e] ?? e; }
+function imprimir() { window.print(); }
 
 async function cargar() {
   const { data } = await api.get('/requisiciones', { params: { estatus: estatus.value || undefined } });

@@ -6,7 +6,7 @@
         <select v-model.number="obraId" class="border border-slate-300 rounded-lg px-2.5 min-h-[40px] text-sm">
           <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
@@ -48,6 +48,10 @@ const obraId = ref(null);
 const inventario = ref([]);
 const cargando = ref(true);
 const obraNombre = computed(() => obras.value.find((o) => o.id === obraId.value)?.nombre ?? '');
+
+function imprimir() {
+  window.print();
+}
 
 async function cargar() {
   if (!obraId.value) return;

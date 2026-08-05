@@ -2,6 +2,7 @@
   <AppShell>
     <div v-if="!datos" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
+      <BotonVolver fallback="/requisiciones" />
       <div class="mb-1">
         <h2 class="font-display text-lg">Expediente — {{ datos.requisicion.partida_nombre }}</h2>
         <p class="text-xs text-slate-500">
@@ -174,6 +175,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
 
 const route = useRoute();

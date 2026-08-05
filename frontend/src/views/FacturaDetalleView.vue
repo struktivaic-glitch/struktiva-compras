@@ -2,6 +2,7 @@
   <AppShell>
     <div v-if="!factura" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
+      <BotonVolver fallback="/facturas" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
         <div>
           <h2 class="font-display text-lg">{{ factura.folio }}</h2>
@@ -66,6 +67,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
+import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
 
 const route = useRoute();

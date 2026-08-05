@@ -9,7 +9,7 @@
           <option value="pagada_parcial">Pagada parcial</option>
           <option value="pagada_total">Pagada total</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
@@ -62,6 +62,7 @@ const estatusPago = ref('');
 const ESTATUS_TEXTO = { pendiente: 'Pendiente', pagada_parcial: 'Pagada parcial', pagada_total: 'Pagada total' };
 function estatusTexto(e) { return ESTATUS_TEXTO[e] ?? e; }
 function mxn(n) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0); }
+function imprimir() { window.print(); }
 
 const totalFacturado = computed(() => facturas.value.reduce((s, f) => s + Number(f.total), 0));
 const totalPagado = computed(() => facturas.value.reduce((s, f) => s + Number(f.monto_pagado), 0));

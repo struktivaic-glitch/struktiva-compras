@@ -6,7 +6,7 @@
         <select v-model.number="proveedorId" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2">
           <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.razon_social }}</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="window.print()">Imprimir / Guardar PDF</button>
+        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
@@ -78,6 +78,7 @@ const proveedorId = ref(null);
 const datos = ref(null);
 
 function mxn(n) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0); }
+function imprimir() { window.print(); }
 
 const proveedorNombre = computed(() => proveedores.value.find((p) => p.id === proveedorId.value)?.razon_social ?? '');
 const saldoTotal = computed(() => (datos.value?.facturas ?? []).reduce((s, f) => s + Number(f.saldo), 0));
