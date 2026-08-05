@@ -38,6 +38,27 @@ cd backend && npm run dev # http://localhost:4000
 cd frontend && npm run dev # http://localhost:5173
 ```
 
+## Cuentas y servicios externos (fuera de Claude)
+
+Todo lo que hay que dar de alta/gestionar por fuera de esta conversación para que el sistema en
+la nube funcione. Los valores secretos (contraseñas, tokens, connection strings) **no se
+repiten aquí** porque este archivo se sube al repositorio de GitHub — viven únicamente como
+variables de entorno en el panel de Render (Settings → Environment de cada servicio).
+
+| Servicio | Para qué se usa | Panel / URL | Cómo se conecta con el resto |
+|---|---|---|---|
+| **GitHub** | Guarda el código fuente (control de versiones). Render lo lee para construir y desplegar. | `github.com/struktivaic-glitch/struktiva-compras` (privado) | Cada `git push` a `main` dispara un redeploy automático en Render (backend y frontend). |
+| **Render** | Hospeda el backend (Web Service, Node/Fastify) y el frontend (Static Site) en el plan gratis. | `dashboard.render.com` | Backend: `struktiva-backend.onrender.com`. Frontend: `struktiva-frontend.onrender.com`. El backend tiene como variables de entorno la conexión a Neon (`DATABASE_URL`), el origen permitido de CORS (`CORS_ORIGIN`, apunta al frontend), y las credenciales de Telegram. |
+| **Neon** | Base de datos real (Postgres), plan gratis. Aquí vive toda la información: obras, requisiciones, usuarios, etc. | `console.neon.tech` | El backend en Render se conecta a través de `DATABASE_URL`. Las migraciones (`npm run migrate`) se corren manualmente contra esta base cuando hay cambios de estructura — no es automático en cada deploy. |
+| **Telegram** | Canal de avisos (alternativa a WhatsApp, ver abajo). Bot `@StruktivaAvisosBot`. | Se administra desde la propia app de Telegram, hablando con **@BotFather** | El backend tiene el token del bot y un "webhook secret" como variables de entorno; Telegram le avisa al backend (`/api/telegram/webhook`) cuando alguien escribe `/start` para vincular su cuenta desde `/perfil`. |
+| **Upstash (Redis)** | Se dio de alta al planear el stack original, pero **no se está usando** — se revisó el código y ninguna función depende de Redis; todo el estado vive en Neon/Postgres. Se puede dar de baja sin afectar nada. | `console.upstash.com` | No conectado a ningún servicio activo actualmente. |
+| **Meta / WhatsApp Business (Cloud API)** | Se intentó como canal de avisos por WhatsApp, pero Meta bloqueó la cuenta con "acceso restringido a publicidad" antes de poder crear el Business Portfolio — sin nada puntual que apelar en Soporte. **Pausado**, se usa Telegram en su lugar. | `developers.facebook.com` / `business.facebook.com` | No conectado — no hay nada configurado del lado del backend para WhatsApp. Se puede retomar más adelante si Meta levanta la restricción o se usa otra cuenta de negocio. |
+
+**Resumen del flujo de despliegue:** editas código → `git push` a GitHub → Render reconstruye
+backend y frontend automáticamente (unos ~100 s) → el backend ya apunta a Neon (datos reales) y
+a Telegram (avisos) sin pasos manuales adicionales, salvo correr una migración nueva si hubo
+cambio de estructura de base de datos.
+
 ## Temas abiertos de diseño (pendientes de definir en un futuro bloque)
 
 - **Traslado de inventario entre obras.** Hoy el inventario (`vw_existencia_obra_insumo`) está
