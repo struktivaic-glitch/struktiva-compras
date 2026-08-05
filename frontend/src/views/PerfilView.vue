@@ -4,6 +4,53 @@
     <p class="text-xs text-slate-500 mb-5">{{ auth.usuario?.nombre }} · {{ auth.usuario?.rolNombre }} · {{ auth.usuario?.email }}</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-5 max-w-sm">
+      <h3 class="text-sm font-display mb-1">Foto de perfil (selfie)</h3>
+      <p class="text-xs text-slate-500 mb-4">
+        Se usa como tu avatar dentro del sistema. La imagen se guarda en la base de datos, así que no se pierde con
+        las actualizaciones del sistema.
+      </p>
+
+      <p v-if="mensajeFoto" class="text-sm rounded-lg px-3 py-2 mb-3" :class="errorFoto ? 'bg-red-50 text-danger border border-danger/30' : 'bg-emerald-50 text-success border border-success/30'">{{ mensajeFoto }}</p>
+
+      <div class="flex items-center gap-4 mb-4">
+        <span class="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+          <img v-if="previewUrl" :src="previewUrl" alt="Vista previa" class="w-full h-full object-cover" />
+          <AvatarUsuario
+            v-else
+            :usuario-id="auth.usuario?.id"
+            :nombre="auth.usuario?.nombre"
+            :tiene-foto="auth.usuario?.tieneFoto !== false"
+            :version="auth.usuario?.fotoVersion"
+            size-class="w-20 h-20"
+            text-size-class="text-xl"
+          />
+        </span>
+        <div class="flex flex-col gap-2">
+          <label class="min-h-[40px] inline-flex items-center justify-center border border-slate-300 text-slate-600 font-bold rounded-lg px-4 text-sm cursor-pointer">
+            {{ procesandoFoto ? 'Procesando…' : 'Tomar / elegir foto' }}
+            <input type="file" accept="image/*" capture="user" class="hidden" :disabled="procesandoFoto" @change="alSeleccionarArchivo" />
+          </label>
+          <button
+            v-if="previewUrl"
+            class="min-h-[40px] bg-primary text-white font-bold rounded-lg px-4 text-sm disabled:opacity-50"
+            :disabled="guardandoFoto"
+            @click="subirFoto"
+          >
+            {{ guardandoFoto ? 'Guardando…' : 'Guardar foto' }}
+          </button>
+          <button
+            v-else-if="auth.usuario?.tieneFoto !== false"
+            class="min-h-[40px] border border-danger text-danger font-bold rounded-lg px-4 text-sm disabled:opacity-50"
+            :disabled="guardandoFoto"
+            @click="quitarFoto"
+          >
+            Quitar foto
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-xl p-5 max-w-sm mt-5">
       <h3 class="text-sm font-display mb-1">PIN de firma</h3>
       <p class="text-xs text-slate-500 mb-4">
         4 dígitos que usarás para autorizar requisiciones cuando no puedas firmar con el dedo
@@ -79,12 +126,104 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
+import AvatarUsuario from '../components/AvatarUsuario.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
 const auth = useAuthStore();
+
+// --- Foto de perfil (selfie) ---
+const previewUrl = ref('');
+const blobPendiente = ref(null);
+const procesandoFoto = ref(false);
+const guardandoFoto = ref(false);
+const mensajeFoto = ref('');
+const errorFoto = ref(false);
+
+async function comprimirImagen(file, maxDim = 480, calidad = 0.82) {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > maxDim || height > maxDim) {
+    if (width >= height) {
+      height = Math.round((height * maxDim) / width);
+      width = maxDim;
+    } else {
+      width = Math.round((width * maxDim) / height);
+      height = maxDim;
+    }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('sin blob'))), 'image/jpeg', calidad));
+}
+
+function limpiarPreview() {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+  previewUrl.value = '';
+  blobPendiente.value = null;
+}
+
+async function alSeleccionarArchivo(ev) {
+  const file = ev.target.files?.[0];
+  ev.target.value = '';
+  if (!file) return;
+  mensajeFoto.value = '';
+  procesandoFoto.value = true;
+  try {
+    const blob = await comprimirImagen(file);
+    limpiarPreview();
+    blobPendiente.value = blob;
+    previewUrl.value = URL.createObjectURL(blob);
+  } catch {
+    errorFoto.value = true;
+    mensajeFoto.value = 'No se pudo procesar esa imagen. Intenta con otra.';
+  } finally {
+    procesandoFoto.value = false;
+  }
+}
+
+async function subirFoto() {
+  if (!blobPendiente.value) return;
+  guardandoFoto.value = true;
+  mensajeFoto.value = '';
+  try {
+    const form = new FormData();
+    form.append('foto', blobPendiente.value, 'selfie.jpg');
+    await api.post('/usuarios/mi-foto', form);
+    auth.actualizarUsuario({ tieneFoto: true, fotoVersion: Date.now() });
+    errorFoto.value = false;
+    mensajeFoto.value = 'Foto de perfil actualizada.';
+    limpiarPreview();
+  } catch (err) {
+    errorFoto.value = true;
+    mensajeFoto.value = err.response?.data?.error || 'No se pudo guardar la foto.';
+  } finally {
+    guardandoFoto.value = false;
+  }
+}
+
+async function quitarFoto() {
+  guardandoFoto.value = true;
+  mensajeFoto.value = '';
+  try {
+    await api.delete('/usuarios/mi-foto');
+    auth.actualizarUsuario({ tieneFoto: false, fotoVersion: Date.now() });
+    errorFoto.value = false;
+    mensajeFoto.value = 'Se quitó tu foto de perfil.';
+  } catch (err) {
+    errorFoto.value = true;
+    mensajeFoto.value = err.response?.data?.error || 'No se pudo quitar la foto.';
+  } finally {
+    guardandoFoto.value = false;
+  }
+}
+
+onBeforeUnmount(limpiarPreview);
+
 const configurado = ref(false);
 const pin = ref('');
 const mensaje = ref('');

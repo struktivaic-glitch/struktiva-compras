@@ -9,9 +9,12 @@
         </div>
         <NotificacionesBell />
         <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full pl-1 pr-3 py-1 text-xs">
-          <span class="w-6 h-6 rounded-full bg-accent text-[#06282a] font-bold flex items-center justify-center text-[11px]">
-            {{ iniciales }}
-          </span>
+          <AvatarUsuario
+            :usuario-id="auth.usuario?.id"
+            :nombre="auth.usuario?.nombre"
+            :tiene-foto="auth.usuario?.tieneFoto !== false"
+            :version="auth.usuario?.fotoVersion"
+          />
           <span>{{ auth.usuario?.nombre }} · {{ auth.usuario?.rolNombre }}</span>
           <RouterLink to="/perfil" class="ml-2 underline decoration-white/40 hover:decoration-white">Perfil</RouterLink>
           <button class="ml-2 underline decoration-white/40 hover:decoration-white" @click="salir">Salir</button>
@@ -58,6 +61,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AvatarUsuario from './AvatarUsuario.vue';
 import BrandMark from './BrandMark.vue';
 import NotificacionesBell from './NotificacionesBell.vue';
 import { useAuthStore } from '../stores/auth.js';
@@ -99,15 +103,6 @@ function alHacerClicFuera(ev) {
 }
 onMounted(() => document.addEventListener('click', alHacerClicFuera));
 onBeforeUnmount(() => document.removeEventListener('click', alHacerClicFuera));
-
-const iniciales = computed(() =>
-  (auth.usuario?.nombre ?? '')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-);
 
 function salir() {
   auth.logout();

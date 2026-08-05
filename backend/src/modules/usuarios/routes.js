@@ -39,10 +39,54 @@ export default async function usuariosRoutes(app) {
     return rows;
   });
 
+  const MIME_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  const FOTO_MAX_BYTES = 4 * 1024 * 1024; // ya viene comprimida desde el navegador; esto es solo un tope de seguridad
+
+  // Selfie de perfil — se guarda en la base de datos (no en disco, ver migración 012) para que
+  // sobreviva a los deploys en el plan gratuito de Render.
+  app.post('/api/usuarios/mi-foto', async (request, reply) => {
+    const archivo = await request.file();
+    if (!archivo) return reply.code(400).send({ error: 'No se recibió ninguna imagen' });
+    if (!MIME_PERMITIDOS.has(archivo.mimetype)) {
+      return reply.code(400).send({ error: 'Formato de imagen no soportado. Usa JPG, PNG o WEBP.' });
+    }
+    const buffer = await archivo.toBuffer();
+    if (buffer.length > FOTO_MAX_BYTES) {
+      return reply.code(400).send({ error: 'La imagen es demasiado grande.' });
+    }
+
+    await pool.query(
+      'UPDATE usuarios SET foto_perfil = $2, foto_perfil_mime = $3, foto_perfil_actualizado = now() WHERE id = $1',
+      [request.user.sub, buffer, archivo.mimetype]
+    );
+    await registrarBitacora(pool, { tabla: 'usuarios', registroId: request.user.sub, usuarioId: request.user.sub, accion: 'actualizar_foto_perfil' });
+    return { ok: true };
+  });
+
+  app.delete('/api/usuarios/mi-foto', async (request) => {
+    await pool.query(
+      'UPDATE usuarios SET foto_perfil = NULL, foto_perfil_mime = NULL, foto_perfil_actualizado = NULL WHERE id = $1',
+      [request.user.sub]
+    );
+    await registrarBitacora(pool, { tabla: 'usuarios', registroId: request.user.sub, usuarioId: request.user.sub, accion: 'eliminar_foto_perfil' });
+    return { ok: true };
+  });
+
+  // Servir la foto de cualquier usuario (autenticado) — para mostrarla en encabezado, listado de
+  // usuarios, etc. 404 si no tiene foto capturada.
+  app.get('/api/usuarios/:id/foto', async (request, reply) => {
+    const { rows } = await pool.query('SELECT foto_perfil, foto_perfil_mime FROM usuarios WHERE id = $1', [request.params.id]);
+    const usuario = rows[0];
+    if (!usuario?.foto_perfil) return reply.code(404).send({ error: 'Este usuario no tiene foto de perfil' });
+    reply.header('Cache-Control', 'private, max-age=300');
+    return reply.type(usuario.foto_perfil_mime || 'image/jpeg').send(usuario.foto_perfil);
+  });
+
   // Catálogo de usuarios — solo Dirección administra; Auditor puede consultar (solo lectura).
   app.get('/api/usuarios', { preHandler: app.requireRole('direccion', 'auditor') }, async () => {
     const { rows } = await pool.query(
-      `SELECT u.id, u.nombre, u.email, u.activo, u.creado_en, r.id AS rol_id, r.clave AS rol_clave, r.nombre AS rol_nombre
+      `SELECT u.id, u.nombre, u.email, u.activo, u.creado_en, (u.foto_perfil IS NOT NULL) AS tiene_foto,
+              r.id AS rol_id, r.clave AS rol_clave, r.nombre AS rol_nombre
        FROM usuarios u JOIN roles r ON r.id = u.rol_id
        ORDER BY u.nombre`
     );

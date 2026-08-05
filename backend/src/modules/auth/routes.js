@@ -10,7 +10,8 @@ export default async function authRoutes(app) {
     }
 
     const { rows } = await pool.query(
-      `SELECT u.id, u.nombre, u.email, u.password_hash, u.activo, r.clave AS rol, r.nombre AS rol_nombre
+      `SELECT u.id, u.nombre, u.email, u.password_hash, u.activo, (u.foto_perfil IS NOT NULL) AS tiene_foto,
+              r.clave AS rol, r.nombre AS rol_nombre
        FROM usuarios u JOIN roles r ON r.id = u.rol_id
        WHERE u.email = $1`,
       [email.toLowerCase().trim()]
@@ -34,11 +35,13 @@ export default async function authRoutes(app) {
         email: usuario.email,
         rol: usuario.rol,
         rolNombre: usuario.rol_nombre,
+        tieneFoto: usuario.tiene_foto,
       },
     };
   });
 
   app.get('/api/auth/me', { preHandler: app.authenticate }, async (request) => {
-    return { usuario: request.user };
+    const { rows } = await pool.query('SELECT (foto_perfil IS NOT NULL) AS tiene_foto FROM usuarios WHERE id = $1', [request.user.sub]);
+    return { usuario: { ...request.user, tieneFoto: Boolean(rows[0]?.tiene_foto) } };
   });
 }

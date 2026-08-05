@@ -24,5 +24,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('struktiva_token');
       localStorage.removeItem('struktiva_usuario');
     },
+    actualizarUsuario(cambios) {
+      this.usuario = { ...this.usuario, ...cambios };
+      localStorage.setItem('struktiva_usuario', JSON.stringify(this.usuario));
+    },
   },
 });

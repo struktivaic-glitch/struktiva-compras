@@ -35,6 +35,7 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+            <th class="px-4 py-2.5 font-normal w-10"></th>
             <th class="text-left px-4 py-2.5 font-normal">Nombre</th>
             <th class="text-left px-4 py-2.5 font-normal">Correo</th>
             <th class="text-left px-4 py-2.5 font-normal">Rol</th>
@@ -45,6 +46,9 @@
         <tbody>
           <template v-for="u in usuarios" :key="u.id">
             <tr v-if="editando !== u.id" class="border-t border-slate-200">
+              <td class="px-4 py-2.5">
+                <AvatarUsuario :usuario-id="u.id" :nombre="u.nombre" :tiene-foto="u.tiene_foto" size-class="w-8 h-8" text-size-class="text-xs" />
+              </td>
               <td class="px-4 py-2.5 font-semibold">{{ u.nombre }}</td>
               <td class="px-4 py-2.5 font-sans">{{ u.email }}</td>
               <td class="px-4 py-2.5 font-sans">{{ u.rol_nombre }}</td>
@@ -59,6 +63,9 @@
               </td>
             </tr>
             <tr v-else class="border-t border-slate-200 bg-slate-50">
+              <td class="px-4 py-2.5">
+                <AvatarUsuario :usuario-id="u.id" :nombre="u.nombre" :tiene-foto="u.tiene_foto" size-class="w-8 h-8" text-size-class="text-xs" />
+              </td>
               <td class="px-4 py-2.5"><input v-model="edicion.nombre" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></td>
               <td class="px-4 py-2.5"><input v-model="edicion.email" type="email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></td>
               <td class="px-4 py-2.5">
@@ -86,6 +93,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
+import AvatarUsuario from '../components/AvatarUsuario.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
