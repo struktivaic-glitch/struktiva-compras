@@ -66,6 +66,7 @@ const CATEGORIAS = [
   { clave: 'orden_compra', label: 'Órdenes de compra', descripcion: 'Sin candado de autorización todavía — categoría preparada para cuando se defina el flujo.', ruta: '/ordenes-compra' },
   { clave: 'cambio_precio', label: 'Cambio de precio', descripcion: 'Variaciones de precio en cotizaciones y facturas que requieren autorización (próximamente).', ruta: '/cotizaciones' },
   { clave: 'cancelacion', label: 'Cancelaciones', descripcion: 'Avisos informativos de requisiciones canceladas.', ruta: '/requisiciones' },
+  { clave: 'incidencia', label: 'Incidencias', descripcion: 'Faltas, permisos, vacaciones e incapacidades pendientes de autorización.', ruta: '/incidencias' },
 ];
 
 const categoriaActiva = ref('requisicion');

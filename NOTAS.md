@@ -309,6 +309,19 @@ cambio de estructura de base de datos.
   Superintendente/Dirección pueden marcar; el resto de roles solo consulta. Probado de punta a
   punta contra Neon (marcar entrada con GPS, marcar salida con GPS, ambos rechazos de duplicado,
   aparece correcto en checador e histórico) y limpiado después.
+- **Bloque HR-C** (05/08/2026): Incidencias (faltas, permisos, vacaciones, incapacidades). Tercer
+  bloque del módulo de RH, mismas reglas HR-A/HR-B (control interno, sin nómina fiscal). Los
+  trabajadores no tienen cuenta propia, así que Residente/Superintendente/Dirección solicita a su
+  nombre; Superintendencia/Dirección autoriza o rechaza — mismo patrón de flujo de dos roles que
+  Requisiciones. Se reutilizó la campanita de notificaciones ya existente (Bloque 15): nueva
+  categoría `incidencia` (avisa a Superintendencia/Dirección cuando hay una pendiente, y al
+  solicitante cuando se resuelve, aprobada o rechazada). Nueva pantalla `/incidencias`: alta,
+  listado filtrable por estatus con acciones Autorizar/Rechazar, impresión. Probado de punta a
+  punta contra Neon: solicitud → notificación a Dirección confirmada → autorización → notificación
+  de vuelta al solicitante confirmada → intento de autorizar dos veces rechazado (422) →
+  segundo caso con rechazo (con comentario) → validación de fecha fin antes de inicio (400) →
+  permisos verificados (Auditor solo lectura, Residente no puede autorizar) — datos de prueba y
+  sus notificaciones eliminados después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo
