@@ -42,6 +42,39 @@
         {{ guardandoPass ? 'Guardando…' : 'Cambiar contraseña' }}
       </button>
     </div>
+
+    <div class="bg-white border border-slate-200 rounded-xl p-5 max-w-sm mt-5">
+      <h3 class="text-sm font-display mb-1">Avisos por Telegram</h3>
+      <p class="text-xs text-slate-500 mb-4">
+        Recibe las mismas notificaciones de la campanita también en Telegram. Estado actual:
+        <span class="font-bold" :class="telegramVinculado ? 'text-success' : 'text-warning'">{{ telegramVinculado ? 'Vinculado' : 'Sin vincular' }}</span>
+      </p>
+
+      <p v-if="mensajeTg" class="text-sm rounded-lg px-3 py-2 mb-3" :class="errorTg ? 'bg-red-50 text-danger border border-danger/30' : 'bg-emerald-50 text-success border border-success/30'">{{ mensajeTg }}</p>
+
+      <template v-if="telegramVinculado">
+        <button class="min-h-[44px] border border-slate-300 text-slate-600 font-bold rounded-lg px-5 text-sm w-full disabled:opacity-50" :disabled="cargandoTg" @click="desvincularTelegram">
+          Desvincular Telegram
+        </button>
+      </template>
+      <template v-else>
+        <a
+          v-if="enlaceTg"
+          :href="enlaceTg"
+          target="_blank"
+          rel="noopener"
+          class="block text-center min-h-[44px] leading-[44px] bg-primary text-white font-bold rounded-lg px-5 text-sm w-full"
+        >
+          Abrir Telegram y vincular
+        </a>
+        <button v-else class="min-h-[44px] bg-primary text-white font-bold rounded-lg px-5 text-sm w-full disabled:opacity-50" :disabled="cargandoTg" @click="generarEnlace">
+          {{ cargandoTg ? 'Generando…' : 'Vincular Telegram' }}
+        </button>
+        <p v-if="enlaceTg" class="text-[11px] text-slate-400 mt-2">
+          Se abre Telegram con el bot listo — solo dale "Enviar" al mensaje que aparece precargado.
+        </p>
+      </template>
+    </div>
   </AppShell>
 </template>
 
@@ -98,8 +131,49 @@ async function guardar() {
   }
 }
 
+const telegramVinculado = ref(false);
+const enlaceTg = ref('');
+const mensajeTg = ref('');
+const errorTg = ref(false);
+const cargandoTg = ref(false);
+
+async function generarEnlace() {
+  mensajeTg.value = '';
+  cargandoTg.value = true;
+  try {
+    const { data } = await api.post('/telegram/vincular');
+    if (data.enlace) {
+      enlaceTg.value = data.enlace;
+    } else {
+      errorTg.value = true;
+      mensajeTg.value = 'No se pudo generar el enlace. Intenta de nuevo en un momento.';
+    }
+  } catch (err) {
+    errorTg.value = true;
+    mensajeTg.value = err.response?.data?.error || 'No se pudo generar el enlace de vinculación.';
+  } finally {
+    cargandoTg.value = false;
+  }
+}
+
+async function desvincularTelegram() {
+  cargandoTg.value = true;
+  try {
+    await api.post('/telegram/desvincular');
+    telegramVinculado.value = false;
+    enlaceTg.value = '';
+    errorTg.value = false;
+    mensajeTg.value = 'Se desvinculó Telegram de tu cuenta.';
+  } finally {
+    cargandoTg.value = false;
+  }
+}
+
 onMounted(async () => {
   const { data } = await api.get('/usuarios/pin/estado');
   configurado.value = data.configurado;
+
+  const { data: tg } = await api.get('/telegram/estado');
+  telegramVinculado.value = tg.vinculado;
 });
 </script>
