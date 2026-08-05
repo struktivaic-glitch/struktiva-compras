@@ -86,6 +86,7 @@ const nav = [
   { to: '/trabajadores', label: 'Personal' },
   { to: '/asistencia', label: 'Asistencia' },
   { to: '/incidencias', label: 'Incidencias' },
+  { to: '/pagos-personal', label: 'Pagos a Personal' },
   { to: '/reportes', label: 'Reportes' },
   { to: '/importar-insumos', label: 'Importar Insumos' },
   { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },

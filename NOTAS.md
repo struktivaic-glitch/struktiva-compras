@@ -322,6 +322,23 @@ cambio de estructura de base de datos.
   segundo caso con rechazo (con comentario) → validación de fecha fin antes de inicio (400) →
   permisos verificados (Auditor solo lectura, Residente no puede autorizar) — datos de prueba y
   sus notificaciones eliminados después.
+- **Bloque HR-D** (05/08/2026): Control interno de pagos a Personal, generalizado más allá de
+  una requisición de Mano de Obra (cierra el plan original del módulo de RH). Nueva pantalla
+  `/pagos-personal`: se captura un pago por persona y rango de fechas, con un botón "Calcular
+  sugerencia" que propone días trabajados (contados desde Asistencia) y monto (días × salario de
+  referencia diario, o el salario mensual completo si es administrativo) — siempre editable antes
+  de guardar. Flujo de dos roles, igual que Incidencias: Residente/Superintendente/Dirección
+  capturan y pueden cancelar mientras esté pendiente; solo Dirección puede "Marcar pagado" (deja
+  de poder editarse o cancelarse una vez pagado — la API lo bloquea explícitamente). Sigue siendo
+  control interno: "marcar pagado" solo registra que el pago ya se hizo por fuera del sistema, no
+  mueve dinero real ni calcula ISR/IMSS. Probado de punta a punta contra Neon: sugerencia (3 días
+  × $350 = $1,050) verificada exacta, creación, bloqueo de "marcar pagado" para quien no es
+  Dirección, edición/cancelación bloqueadas después de pagado, cancelación de un pendiente,
+  permisos de Auditor (solo lectura) — datos de prueba eliminados y el salario de referencia de
+  prueba revertido después.
+
+  **Con esto queda cerrado el plan original del módulo de Recursos Humanos**: Expediente de
+  Personal (HR-A) → Asistencia/checador (HR-B) → Incidencias (HR-C) → Pagos a Personal (HR-D).
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo

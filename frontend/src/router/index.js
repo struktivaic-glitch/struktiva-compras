@@ -12,6 +12,7 @@ const routes = [
   { path: '/trabajadores/:id', name: 'personal-detalle', component: () => import('../views/PersonalDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/asistencia', name: 'asistencia', component: () => import('../views/AsistenciaView.vue'), meta: { requiresAuth: true } },
   { path: '/incidencias', name: 'incidencias', component: () => import('../views/IncidenciasView.vue'), meta: { requiresAuth: true } },
+  { path: '/pagos-personal', name: 'pagos-personal', component: () => import('../views/PagosPersonalView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones', name: 'cotizaciones', component: () => import('../views/CotizacionesListView.vue'), meta: { requiresAuth: true } },
   { path: '/cotizaciones/nueva', name: 'cotizacion-nueva', component: () => import('../views/CotizacionNuevaView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },
   { path: '/cotizaciones/:id', name: 'cotizacion-detalle', component: () => import('../views/CotizacionDetalleView.vue'), meta: { requiresAuth: true } },
