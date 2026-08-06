@@ -34,7 +34,7 @@ async function cargarRequisicionCompleta(client, id) {
   const { rows: cab } = await client.query(
     `SELECT r.*, o.nombre AS obra_nombre, e.nombre AS etapa_nombre, f.nombre AS frente_nombre,
             p.clave AS partida_clave, p.nombre AS partida_nombre,
-            us.nombre AS solicitante_nombre, ua.nombre AS autoriza_nombre
+            us.nombre AS solicitante_nombre, ua.nombre AS autoriza_nombre, uc.nombre AS cancelado_por_nombre
      FROM requisiciones r
      JOIN obras o ON o.id = r.obra_id
      JOIN etapas e ON e.id = r.etapa_id
@@ -42,6 +42,7 @@ async function cargarRequisicionCompleta(client, id) {
      JOIN partidas p ON p.id = r.partida_id
      JOIN usuarios us ON us.id = r.usuario_solicitante_id
      LEFT JOIN usuarios ua ON ua.id = r.usuario_autoriza_id
+     LEFT JOIN usuarios uc ON uc.id = r.cancelado_por
      WHERE r.id = $1`,
     [id]
   );
@@ -345,6 +346,7 @@ export default async function requisicionesRoutes(app) {
 
   app.post('/api/requisiciones/:id/cancelar', async (request, reply) => {
     const { id } = request.params;
+    const { motivo } = request.body ?? {};
     const resultado = await withTransaction(async (client) => {
       const { rows } = await client.query('SELECT estatus, folio, usuario_solicitante_id FROM requisiciones WHERE id = $1 FOR UPDATE', [id]);
       const req = rows[0];
@@ -356,10 +358,14 @@ export default async function requisicionesRoutes(app) {
         return { error: 409, mensaje: 'Esta requisición ya no puede cancelarse' };
       }
 
-      await client.query("UPDATE requisiciones SET estatus = 'cancelada', actualizado_en = now() WHERE id = $1", [id]);
+      await client.query(
+        `UPDATE requisiciones SET estatus = 'cancelada', cancelado_por = $2, fecha_cancelacion = now(),
+           motivo_cancelacion = $3, actualizado_en = now() WHERE id = $1`,
+        [id, request.user.sub, motivo?.trim() || null]
+      );
       await registrarBitacora(client, {
         tabla: 'requisiciones', registroId: id, usuarioId: request.user.sub, accion: 'cancelar',
-        antes: { estatus: req.estatus }, despues: { estatus: 'cancelada' },
+        antes: { estatus: req.estatus }, despues: { estatus: 'cancelada', motivo: motivo?.trim() || null },
       });
       // Aviso informativo — no bloquea al que cancela, solo mantiene a Dirección/Auditoría enteradas.
       await notificarPorRol(client, {

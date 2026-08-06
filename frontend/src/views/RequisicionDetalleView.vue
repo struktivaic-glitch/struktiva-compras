@@ -14,7 +14,6 @@
           </p>
           <p class="text-xs text-slate-500 mt-0.5">
             Solicitante: {{ req.solicitante_nombre }} · Creada: {{ formatoFecha(req.creado_en) }}
-            <template v-if="req.autoriza_nombre"> · Autorizó: {{ req.autoriza_nombre }} ({{ formatoFecha(req.fecha_autorizacion) }})</template>
           </p>
         </div>
         <div class="flex items-center gap-2 flex-none">
@@ -33,6 +32,21 @@
           :titulo="`Requisición ${req.folio}`"
           :subtitulo="`${req.obra_nombre} / ${req.frente_nombre} / ${req.partida_clave} — ${req.partida_nombre} · Solicitante: ${req.solicitante_nombre} · Estatus: ${estatusTexto(req.estatus)}`"
         />
+
+        <div class="text-xs text-slate-600 mb-4 space-y-1">
+          <div>Creada: {{ formatoFecha(req.creado_en) }} por {{ req.solicitante_nombre }}</div>
+          <div v-if="req.autoriza_nombre">Autorizó: <b>{{ req.autoriza_nombre }}</b> — {{ formatoFecha(req.fecha_autorizacion) }}</div>
+          <div v-if="req.estatus === 'cancelada'">
+            Canceló: <b>{{ req.cancelado_por_nombre || '—' }}</b> — {{ formatoFecha(req.fecha_cancelacion) }}
+            <template v-if="req.motivo_cancelacion"> · Motivo: {{ req.motivo_cancelacion }}</template>
+          </div>
+          <div v-for="f in firmas" :key="f.id">
+            Firma ({{ f.tipo === 'tactil' ? 'táctil' : 'PIN' }}): <b>{{ f.usuario_nombre }}</b> — {{ formatoFecha(f.creado_en) }}
+            · Ubicación: {{ f.gps_lat != null ? `${Number(f.gps_lat).toFixed(5)}, ${Number(f.gps_lng).toFixed(5)}` : 'no disponible' }}
+            <template v-if="f.ip"> · IP: {{ f.ip }}</template>
+          </div>
+        </div>
+
         <table class="w-full text-sm tabular-nums">
           <thead>
             <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
@@ -122,7 +136,7 @@
         <button
           v-if="!['atendida_parcial', 'atendida_total', 'cancelada'].includes(req.estatus) && puedeModificar"
           class="min-h-[44px] border border-danger text-danger font-bold rounded-lg px-5 text-sm"
-          @click="accion('cancelar')"
+          @click="mostrarCancelar = true"
         >
           Cancelar
         </button>
@@ -136,6 +150,21 @@
         @firmado="autorizarConFirma"
         @cerrar="mostrarFirma = false"
       />
+
+      <div v-if="mostrarCancelar" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 no-print" @click.self="mostrarCancelar = false">
+        <div class="bg-white rounded-xl p-5 w-full max-w-sm">
+          <h3 class="text-sm font-display mb-1">Cancelar {{ req.folio }}</h3>
+          <p class="text-xs text-slate-500 mb-4">El motivo queda registrado y visible en la impresión de la requisición.</p>
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Motivo (opcional)</label>
+          <textarea v-model="motivoCancelacion" rows="3" class="w-full border border-slate-300 rounded-lg px-2.5 py-2 mb-3" placeholder="Ej. ya no se requiere el material"></textarea>
+          <div class="flex gap-2">
+            <button class="flex-1 min-h-[42px] border border-danger text-danger font-bold rounded-lg text-sm disabled:opacity-50" :disabled="cancelando" @click="confirmarCancelacion">
+              {{ cancelando ? 'Cancelando…' : 'Confirmar cancelación' }}
+            </button>
+            <button class="min-h-[42px] px-4 border border-slate-300 rounded-lg text-sm" @click="mostrarCancelar = false">Volver</button>
+          </div>
+        </div>
+      </div>
     </template>
   </AppShell>
 </template>
@@ -157,6 +186,10 @@ const error = ref('');
 const mensaje = ref('');
 const mostrarFirma = ref(false);
 const firmaModalRef = ref(null);
+const firmas = ref([]);
+const mostrarCancelar = ref(false);
+const motivoCancelacion = ref('');
+const cancelando = ref(false);
 
 function imprimir() {
   window.print();
@@ -196,6 +229,8 @@ function formatoFecha(fecha) {
 async function cargar() {
   const { data } = await api.get(`/requisiciones/${route.params.id}`);
   req.value = data;
+  const { data: firmasData } = await api.get('/firmas', { params: { entidadTipo: 'requisicion', entidadId: data.id } });
+  firmas.value = firmasData;
 }
 
 async function accion(tipo) {
@@ -207,6 +242,23 @@ async function accion(tipo) {
     await cargar();
   } catch (err) {
     error.value = err.response?.data?.error || 'No se pudo completar la acción.';
+  }
+}
+
+async function confirmarCancelacion() {
+  error.value = '';
+  mensaje.value = '';
+  cancelando.value = true;
+  try {
+    await api.post(`/requisiciones/${req.value.id}/cancelar`, { motivo: motivoCancelacion.value });
+    mostrarCancelar.value = false;
+    motivoCancelacion.value = '';
+    mensaje.value = 'Requisición cancelada.';
+    await cargar();
+  } catch (err) {
+    error.value = err.response?.data?.error || 'No se pudo cancelar.';
+  } finally {
+    cancelando.value = false;
   }
 }
 

@@ -396,6 +396,21 @@ cambio de estructura de base de datos.
     `tiene_foto_*` reflejadas correctamente en checador e histórico, campo de foto inválido
     rechazado (400), sin foto da 404, sin sesión da 401, Auditor puede ver pero no subir (403) —
     dato de prueba eliminado después.
+- **Bloque 27** (06/08/2026): auditoría visible en la impresión de Requisiciones. El usuario pidió
+  verificar que autorización/cancelación/firmas salgan en la impresión — al revisar el código
+  encontré 3 huecos reales: (1) "Autorizó: X (fecha)" vivía en el bloque `no-print`, nunca
+  aparecía al imprimir; (2) cancelar una requisición no guardaba quién, cuándo ni por qué —
+  solo cambiaba el estatus; (3) el detalle de firma (tipo, IP, GPS, hora exacta) ya se
+  capturaba y tenía endpoint (`GET /api/firmas`) pero nunca se mostraba en ningún lado, ni
+  pantalla ni impresión. Corregido:
+  - Migración 019: `requisiciones.cancelado_por/fecha_cancelacion/motivo_cancelacion`.
+  - Backend: `POST /:id/cancelar` ahora acepta `motivo` opcional y lo guarda.
+  - Frontend: el bloque de auditoría (creó/autorizó/canceló+motivo/firma con ubicación e IP)
+    ahora vive dentro del `print-sheet`, así que sí sale al imprimir. Cancelar ahora abre un
+    modal pidiendo el motivo (opcional) en vez de cancelar directo.
+  - Probado de punta a punta contra Neon: autorización con firma táctil + GPS confirmada
+    recuperable vía `/api/firmas`; cancelación con motivo confirmada guardada y visible —
+    datos de prueba eliminados después.
 - **Bloque 23** (05/08/2026): desglose de personal para requisiciones de Mano de Obra — control
   interno de gasto, explícitamente sin tocar temas fiscales/nómina real. Decisiones tomadas por
   el usuario: la sección "Personal asignado" vive aparte (no ligada a un renglón de insumo
