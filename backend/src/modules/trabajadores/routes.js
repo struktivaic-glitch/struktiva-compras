@@ -44,7 +44,7 @@ export default async function trabajadoresRoutes(app) {
   app.get('/api/trabajadores', async (request) => {
     const soloActivos = request.query.incluirInactivos !== '1';
     const { rows } = await pool.query(
-      `SELECT t.id, t.nombre, t.oficio, t.activo, t.tipo, t.puesto, o.nombre AS obra_nombre
+      `SELECT t.id, t.nombre, t.oficio, t.activo, t.tipo, t.puesto, t.salario_referencia, t.salario_periodo, o.nombre AS obra_nombre
        FROM trabajadores t
        LEFT JOIN obras o ON o.id = t.obra_id
        ${soloActivos ? 'WHERE t.activo' : ''}

@@ -47,7 +47,8 @@
           </div>
         </div>
 
-        <table class="w-full text-sm tabular-nums">
+        <!-- Materiales: tabla plana de insumos -->
+        <table v-if="req.tipo !== 'nomina'" class="w-full text-sm tabular-nums">
           <thead>
             <tr class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <th class="text-left px-4 py-2.5 font-normal font-sans">Insumo</th>
@@ -87,6 +88,38 @@
             </tr>
           </tfoot>
         </table>
+
+        <!-- Nómina: árbol Partida → Renglón de Mano de Obra → Personal -->
+        <div v-else>
+          <div v-for="d in req.detalle" :key="d.id" class="border border-slate-200 rounded-lg p-3 mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold text-sm font-sans">{{ d.clave }} · {{ d.descripcion }}</span>
+              <span v-if="d.excede_presupuesto" class="text-[11px] font-bold text-danger">Excede</span>
+              <span v-else class="text-[11px] text-slate-400">Normal</span>
+            </div>
+            <table class="w-full text-sm tabular-nums mt-1">
+              <thead>
+                <tr class="text-[10.5px] uppercase tracking-wide text-slate-400">
+                  <th class="text-left py-1 font-normal font-sans">Persona</th>
+                  <th class="text-left py-1 font-normal font-sans">Días</th>
+                  <th class="text-left py-1 font-normal font-sans">Tarifa diaria</th>
+                  <th class="text-left py-1 font-normal font-sans">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in d.personal" :key="p.id" class="border-t border-slate-100">
+                  <td class="py-1.5 font-sans">{{ p.nombre }}</td>
+                  <td class="py-1.5">{{ p.dias_trabajados }}</td>
+                  <td class="py-1.5">{{ mxn(p.tarifa_diaria) }}</td>
+                  <td class="py-1.5 font-semibold">{{ mxn(p.monto) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="text-sm font-bold mt-1.5">Total del renglón: {{ mxn(d.total_sugerido) }}</p>
+            <p v-if="d.excede_presupuesto && d.justificacion" class="text-xs text-slate-600 font-sans mt-1"><b>Justificación:</b> {{ d.justificacion }}</p>
+          </div>
+          <p class="text-sm font-display font-bold">Total de Nómina: {{ mxn(totalRequisicion) }}</p>
+        </div>
 
         <template v-if="req.personal?.length">
           <h3 class="text-sm font-display mt-5 mb-2">Personal asignado (Mano de Obra)</h3>

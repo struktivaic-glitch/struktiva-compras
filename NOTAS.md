@@ -427,3 +427,40 @@ cambio de estructura de base de datos.
   inmediato. Probado de punta a punta en producción: 20 jornales × $350 = $7,000 repartidos
   entre 2 trabajadores ($3,500 c/u) — guardó, se mostró correcto en consulta e impresión; caso
   con suma incorrecta ($5,000 en vez de $7,000) rechazado con error claro antes de guardar.
+- **Bloque 28** (06/08/2026): segundo tipo de Requisición — "Nómina" — para cuando el gasto es
+  Mano de Obra. El usuario notó que el Bloque 23 (desglose de personal) obligaba a capturar
+  cantidades de insumo aunque lo que realmente varía persona a persona es el sueldo, no una
+  cantidad; pidió un tipo de requisición aparte donde el cargo a la partida de Mano de Obra sea
+  por MONTO, no por cantidad. Diseño acordado con el usuario tras varias rondas (incluyendo
+  revisar un Excel real que compartió y resolver el caso "Tito": un contratista que en la misma
+  requisición trabaja unos días como Peón y otros como Albañil):
+  - Árbol: Requisición (tipo `nomina`) → Partida (igual que antes, a nivel cabecera) → **Renglón**
+    (un rubro de Mano de Obra, ej. Peón, Albañil — cada uno con su propio presupuesto) →
+    **desglose de personal** (trabajador + días trabajados + tarifa diaria; el monto = días×tarifa
+    siempre se calcula, nunca se captura directo). El total del renglón es la suma de su propio
+    desglose — por construcción nunca puede "no cuadrar".
+  - Caso Tito resuelto de la forma más simple: el mismo trabajador puede aparecer en varios
+    renglones de la misma requisición (cada uno con su propio días/tarifa) — el cargo cae
+    directo sobre los insumos reales existentes, sin necesitar un "insumo compuesto" nuevo.
+  - Para reusar toda la maquinaria ya existente de presupuesto/excedente/justificación (pensada
+    para materiales): internamente se calcula una "cantidad equivalente" =
+    montoDelRenglón ÷ costoUnitarioPresupuestado, de forma que cantidad × precio = exactamente
+    el monto del renglón.
+  - Alta directa de rubros nuevos de Mano de Obra (sin pasar por el importador de Excel) desde la
+    misma pantalla de captura — nuevo endpoint `/api/insumos`. Arrancan con presupuesto en $0 a
+    propósito (así cualquier uso muestra "excede" de inmediato); Dirección autoriza después el
+    estimado real con `PUT /api/insumos/:id/presupuesto`. Si no se indica una familia, el
+    backend busca o crea sola la familia "Mano de Obra" — así funciona igual aunque la obra no
+    tenga todavía ningún rubro de Mano de Obra en su catálogo.
+  - Migración 020: `requisiciones.tipo` (`materiales`/`nomina`); `requisicion_personal` ahora
+    también puede colgar de un renglón (`requisicion_detalle_id`) además del uso plano anterior
+    del Bloque 23, que se conservó sin cambios para no romper nada existente.
+  - Frontend: toggle "Materiales / Nómina" en Nueva Requisición; captura por renglones con su
+    propio catálogo de Mano de Obra y modal de alta rápida; en Consulta/Expediente, el árbol de
+    renglones con su desglose de personal vive dentro del área imprimible (mismo criterio del
+    Bloque 27); badge "Nómina" en el listado.
+  - Probado de punta a punta: primero contra Neon por API (caso Tito completo: Pancho Perez con
+    2 días de Peón sin excedente + 2 días de un rubro nuevo con excedente y justificación,
+    autorización con firma, consumo de presupuesto verificado), y después repetido igual en el
+    navegador de punta a punta (crear renglones, dar de alta un rubro nuevo desde la UI, ver el
+    árbol en la impresión) — datos de prueba eliminados después en ambas rondas.

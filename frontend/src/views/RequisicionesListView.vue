@@ -37,6 +37,7 @@
           <tr v-for="r in requisiciones" :key="r.id" class="border-t border-slate-200">
             <td class="px-4 py-2.5 font-semibold tabular-nums">
               <RouterLink :to="`/requisiciones/${r.id}`" class="text-primary underline decoration-primary/30 hover:decoration-primary">{{ r.folio }}</RouterLink>
+              <span v-if="r.tipo === 'nomina'" class="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Nómina</span>
               <span v-if="r.renglones_excedidos > 0" class="ml-1.5 text-[10px] font-bold text-danger">● excede</span>
             </td>
             <td class="px-4 py-2.5">{{ r.obra_nombre }} / {{ r.frente_nombre }} / {{ r.partida_nombre }}</td>

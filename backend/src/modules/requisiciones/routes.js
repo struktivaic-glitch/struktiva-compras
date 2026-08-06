@@ -63,7 +63,7 @@ async function cargarRequisicionCompleta(client, id) {
   );
 
   const { rows: personal } = await client.query(
-    `SELECT rp.id, rp.trabajador_id, rp.monto, t.nombre, t.oficio
+    `SELECT rp.id, rp.trabajador_id, rp.requisicion_detalle_id, rp.monto, rp.dias_trabajados, rp.tarifa_diaria, t.nombre, t.oficio
      FROM requisicion_personal rp
      JOIN trabajadores t ON t.id = rp.trabajador_id
      WHERE rp.requisicion_id = $1
@@ -71,7 +71,16 @@ async function cargarRequisicionCompleta(client, id) {
     [id]
   );
 
-  return { ...cab[0], detalle, personal };
+  // Personal "plano" (Bloque 23, requisiciones de materiales con Mano de Obra mezclada) vs.
+  // personal anidado por renglón (Bloque 28, requisiciones de nómina — cada detalle trae su
+  // propio desglose, para que el árbol Partida → Renglón → Personal se pueda dibujar tal cual).
+  const detalleConPersonal = detalle.map((d) => ({
+    ...d,
+    personal: personal.filter((p) => p.requisicion_detalle_id === d.id),
+  }));
+  const personalPlano = personal.filter((p) => p.requisicion_detalle_id === null);
+
+  return { ...cab[0], detalle: detalleConPersonal, personal: personalPlano };
 }
 
 export default async function requisicionesRoutes(app) {
@@ -104,7 +113,7 @@ export default async function requisicionesRoutes(app) {
 
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const { rows } = await pool.query(
-      `SELECT r.id, r.folio, r.estatus, r.creado_en, r.usuario_solicitante_id,
+      `SELECT r.id, r.folio, r.estatus, r.tipo, r.creado_en, r.usuario_solicitante_id,
               o.nombre AS obra_nombre, f.nombre AS frente_nombre, p.nombre AS partida_nombre,
               us.nombre AS solicitante_nombre,
               (SELECT COUNT(*) FROM requisicion_detalle rd WHERE rd.requisicion_id = r.id AND rd.excede_presupuesto) AS renglones_excedidos
@@ -128,7 +137,8 @@ export default async function requisicionesRoutes(app) {
   });
 
   app.post('/api/requisiciones', async (request, reply) => {
-    const { obraId, etapaId, frenteId, partidaId, items, personal } = request.body ?? {};
+    const { obraId, etapaId, frenteId, partidaId, items, personal, tipo } = request.body ?? {};
+    const tipoReq = tipo === 'nomina' ? 'nomina' : 'materiales';
     if (!obraId || !etapaId || !frenteId || !partidaId || !Array.isArray(items) || items.length === 0) {
       return reply.code(400).send({ error: 'Obra, etapa, frente, partida y al menos un insumo son obligatorios' });
     }
@@ -148,22 +158,53 @@ export default async function requisicionesRoutes(app) {
         const erroresJustificacion = [];
         const erroresPrecio = [];
         let montoManoDeObra = 0;
-        const itemsValidados = items.map((item) => {
-          const info = saldoPorInsumo.get(item.insumoId);
-          const saldo = Number(info?.saldo_disponible ?? 0);
-          const excede = Number(item.cantidadRequerida) > saldo;
-          if (excede && !item.justificacion?.trim()) {
-            erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
+        let itemsValidados;
+
+        if (tipoReq === 'nomina') {
+          // Requisición de Nómina (Bloque 28): no se captura cantidad ni P.U. directo — cada
+          // renglón es un rubro de Mano de Obra y se desglosa en personal (días × tarifa diaria).
+          // La cantidad y el P.U. se derivan del propio desglose, para que el total del renglón
+          // SIEMPRE sea exactamente la suma de su personal (nunca puede "no cuadrar").
+          const erroresPersonal = [];
+          itemsValidados = items.map((item) => {
+            const info = saldoPorInsumo.get(item.insumoId);
+            const personalItem = Array.isArray(item.personal)
+              ? item.personal.filter((p) => p.trabajadorId && Number(p.diasTrabajados) > 0 && Number(p.tarifaDiaria) > 0)
+              : [];
+            if (personalItem.length === 0) erroresPersonal.push(item.insumoId);
+            const montoRenglon = personalItem.reduce((acc, p) => acc + Number(p.diasTrabajados) * Number(p.tarifaDiaria), 0);
+            const costoUnitario = Number(info?.costo_unitario ?? 0);
+            if (!(costoUnitario > 0)) erroresPrecio.push(item.insumoId);
+            const cantidadRequerida = costoUnitario > 0 ? montoRenglon / costoUnitario : 0;
+            const saldo = Number(info?.saldo_disponible ?? 0);
+            const excede = cantidadRequerida > saldo;
+            if (excede && !item.justificacion?.trim()) {
+              erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
+            }
+            montoManoDeObra += montoRenglon;
+            return { ...item, personal: personalItem, cantidadRequerida, precioUnitario: costoUnitario, excede };
+          });
+          if (erroresPersonal.length > 0) {
+            throw Object.assign(new Error('RENGLON_SIN_PERSONAL'), { code: 400 });
           }
-          // El P.U. lo captura quien pide la requisición (visible desde el inicio, no un cálculo
-          // oculto contra el presupuesto) — solo caemos al costo presupuestado si no mandaron nada.
-          const precioUnitario = item.precioUnitario != null && item.precioUnitario !== '' ? Number(item.precioUnitario) : Number(info?.costo_unitario ?? 0);
-          if (!(precioUnitario > 0)) erroresPrecio.push(item.insumoId);
-          if (info?.es_mano_de_obra) {
-            montoManoDeObra += Number(item.cantidadRequerida) * precioUnitario;
-          }
-          return { ...item, excede, precioUnitario };
-        });
+        } else {
+          itemsValidados = items.map((item) => {
+            const info = saldoPorInsumo.get(item.insumoId);
+            const saldo = Number(info?.saldo_disponible ?? 0);
+            const excede = Number(item.cantidadRequerida) > saldo;
+            if (excede && !item.justificacion?.trim()) {
+              erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
+            }
+            // El P.U. lo captura quien pide la requisición (visible desde el inicio, no un cálculo
+            // oculto contra el presupuesto) — solo caemos al costo presupuestado si no mandaron nada.
+            const precioUnitario = item.precioUnitario != null && item.precioUnitario !== '' ? Number(item.precioUnitario) : Number(info?.costo_unitario ?? 0);
+            if (!(precioUnitario > 0)) erroresPrecio.push(item.insumoId);
+            if (info?.es_mano_de_obra) {
+              montoManoDeObra += Number(item.cantidadRequerida) * precioUnitario;
+            }
+            return { ...item, excede, precioUnitario };
+          });
+        }
 
         if (erroresPrecio.length > 0) {
           throw Object.assign(new Error('PRECIO_UNITARIO_REQUERIDO'), { code: 400 });
@@ -175,34 +216,49 @@ export default async function requisicionesRoutes(app) {
           throw err;
         }
 
-        const personalValidado = Array.isArray(personal) ? personal.filter((p) => p.trabajadorId && Number(p.monto) > 0) : [];
-        if (personalValidado.length > 0) {
-          if (montoManoDeObra <= 0) {
-            throw Object.assign(new Error('PERSONAL_SIN_MANO_DE_OBRA'), { code: 422 });
-          }
-          const sumaPersonal = personalValidado.reduce((acc, p) => acc + Number(p.monto), 0);
-          if (Math.abs(sumaPersonal - montoManoDeObra) > 0.01) {
-            throw Object.assign(new Error('PERSONAL_NO_CUADRA'), {
-              code: 422,
-              detalle: { sumaPersonal, montoManoDeObra },
-            });
+        // Personal "plano" — solo aplica al flujo anterior (materiales con Mano de Obra
+        // mezclada, Bloque 23). Para nómina, el personal ya viene validado y anidado por renglón.
+        let personalValidado = [];
+        if (tipoReq !== 'nomina') {
+          personalValidado = Array.isArray(personal) ? personal.filter((p) => p.trabajadorId && Number(p.monto) > 0) : [];
+          if (personalValidado.length > 0) {
+            if (montoManoDeObra <= 0) {
+              throw Object.assign(new Error('PERSONAL_SIN_MANO_DE_OBRA'), { code: 422 });
+            }
+            const sumaPersonal = personalValidado.reduce((acc, p) => acc + Number(p.monto), 0);
+            if (Math.abs(sumaPersonal - montoManoDeObra) > 0.01) {
+              throw Object.assign(new Error('PERSONAL_NO_CUADRA'), {
+                code: 422,
+                detalle: { sumaPersonal, montoManoDeObra },
+              });
+            }
           }
         }
 
         const folio = await siguienteFolio(client, 'REQ', 'requisiciones_folio_seq');
         const { rows: reqRows } = await client.query(
-          `INSERT INTO requisiciones (folio, obra_id, etapa_id, frente_id, partida_id, usuario_solicitante_id, estatus)
-           VALUES ($1, $2, $3, $4, $5, $6, 'borrador') RETURNING id`,
-          [folio, obraId, etapaId, frenteId, partidaId, request.user.sub]
+          `INSERT INTO requisiciones (folio, obra_id, etapa_id, frente_id, partida_id, usuario_solicitante_id, estatus, tipo)
+           VALUES ($1, $2, $3, $4, $5, $6, 'borrador', $7) RETURNING id`,
+          [folio, obraId, etapaId, frenteId, partidaId, request.user.sub, tipoReq]
         );
         const requisicionId = reqRows[0].id;
 
         for (const item of itemsValidados) {
-          await client.query(
+          const { rows: detalleRows } = await client.query(
             `INSERT INTO requisicion_detalle (requisicion_id, insumo_id, cantidad_requerida, excede_presupuesto, justificacion, precio_unitario)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
             [requisicionId, item.insumoId, item.cantidadRequerida, item.excede, item.justificacion ?? null, item.precioUnitario]
           );
+          if (tipoReq === 'nomina') {
+            for (const p of item.personal) {
+              const monto = Number(p.diasTrabajados) * Number(p.tarifaDiaria);
+              await client.query(
+                `INSERT INTO requisicion_personal (requisicion_id, requisicion_detalle_id, trabajador_id, monto, dias_trabajados, tarifa_diaria)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [requisicionId, detalleRows[0].id, p.trabajadorId, monto, p.diasTrabajados, p.tarifaDiaria]
+              );
+            }
+          }
         }
 
         for (const p of personalValidado) {
@@ -217,7 +273,7 @@ export default async function requisicionesRoutes(app) {
           registroId: requisicionId,
           usuarioId: request.user.sub,
           accion: 'crear',
-          despues: { folio, estatus: 'borrador', items: itemsValidados, personal: personalValidado },
+          despues: { folio, estatus: 'borrador', tipo: tipoReq, items: itemsValidados, personal: personalValidado },
         });
 
         return cargarRequisicionCompleta(client, requisicionId);
@@ -233,6 +289,9 @@ export default async function requisicionesRoutes(app) {
       }
       if (err.message === 'PRECIO_UNITARIO_REQUERIDO') {
         return reply.code(400).send({ error: 'Captura un precio unitario mayor a cero en cada insumo.' });
+      }
+      if (err.message === 'RENGLON_SIN_PERSONAL') {
+        return reply.code(400).send({ error: 'Cada renglón de nómina necesita al menos una persona con días y tarifa capturados.' });
       }
       if (err.message === 'PERSONAL_SIN_MANO_DE_OBRA') {
         return reply.code(422).send({ error: 'Agrega un insumo de la familia Mano de Obra antes de asignar personal.' });

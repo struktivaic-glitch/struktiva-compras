@@ -3,23 +3,45 @@
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div>
         <h2 class="font-display text-lg">Nueva requisición</h2>
-        <p class="text-xs text-slate-500">Selecciona la obra y el frente/partida donde se usará el material, y agrega los insumos requeridos.</p>
+        <p class="text-xs text-slate-500">
+          {{ tipoRequisicion === 'nomina'
+            ? 'Cada renglón es un rubro de Mano de Obra; se desglosa en las personas que cobran contra él (días × tarifa).'
+            : 'Selecciona la obra y el frente/partida donde se usará el material, y agrega los insumos requeridos.' }}
+        </p>
       </div>
-      <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden">
-        <button
-          class="text-xs font-semibold px-4 py-2"
-          :class="vista === 'desktop' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
-          @click="vista = 'desktop'"
-        >
-          Vista escritorio
-        </button>
-        <button
-          class="text-xs font-semibold px-4 py-2"
-          :class="vista === 'mobile' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
-          @click="vista = 'mobile'"
-        >
-          Vista campo (móvil)
-        </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden">
+          <button
+            class="text-xs font-semibold px-4 py-2"
+            :class="tipoRequisicion === 'materiales' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
+            @click="tipoRequisicion = 'materiales'"
+          >
+            Materiales
+          </button>
+          <button
+            class="text-xs font-semibold px-4 py-2"
+            :class="tipoRequisicion === 'nomina' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
+            @click="tipoRequisicion = 'nomina'; cargarInsumosManoDeObra()"
+          >
+            Nómina
+          </button>
+        </div>
+        <div v-if="tipoRequisicion === 'materiales'" class="inline-flex border border-slate-300 rounded-lg overflow-hidden">
+          <button
+            class="text-xs font-semibold px-4 py-2"
+            :class="vista === 'desktop' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
+            @click="vista = 'desktop'"
+          >
+            Vista escritorio
+          </button>
+          <button
+            class="text-xs font-semibold px-4 py-2"
+            :class="vista === 'mobile' ? 'bg-primary text-white' : 'bg-white text-slate-500'"
+            @click="vista = 'mobile'"
+          >
+            Vista campo (móvil)
+          </button>
+        </div>
       </div>
     </div>
 
@@ -50,6 +72,7 @@
       </div>
     </div>
 
+    <template v-if="tipoRequisicion === 'materiales'">
     <div v-if="obraId" class="bg-white border border-slate-200 rounded-xl p-4 mb-5">
       <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Agregar insumo</label>
       <div class="flex gap-2">
@@ -254,6 +277,128 @@
         <span v-if="!personalCuadra && personal.length"> — no cuadra, faltan {{ mxn(montoManoDeObra - sumaPersonal) }}</span>
       </p>
     </div>
+    </template>
+
+    <!-- ===== Requisición de Nómina (Bloque 28) ===== -->
+    <template v-else-if="tipoRequisicion === 'nomina'">
+      <div v-if="obraId" class="flex gap-2 mb-5">
+        <button type="button" class="min-h-[44px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm" @click="abrirCatalogoManoDeObra">
+          + Agregar renglón de Mano de Obra
+        </button>
+      </div>
+
+      <div v-for="(renglon, ridx) in renglonesNomina" :key="renglon.insumoId" class="bg-white border border-slate-200 rounded-xl p-4 mb-3" :class="excedeRenglon(renglon) ? 'border-danger' : ''">
+        <div class="flex items-center justify-between mb-1">
+          <div>
+            <span class="font-semibold text-sm">{{ renglon.descripcion }}</span>
+            <span class="text-xs text-slate-400 ml-1">({{ renglon.clave }}) · saldo disponible: {{ renglon.saldoDisponible }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span v-if="excedeRenglon(renglon)" class="text-[11.5px] font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-danger">Excede</span>
+            <span v-else class="text-[11.5px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-success">OK</span>
+            <button class="text-slate-400 hover:text-danger" @click="renglonesNomina.splice(ridx, 1)">✕</button>
+          </div>
+        </div>
+
+        <div v-if="renglon.personal.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 my-2">
+          <div v-for="(p, pidx) in renglon.personal" :key="pidx" class="flex items-center justify-between px-3 py-2 text-sm">
+            <span>{{ nombreTrabajador(p.trabajadorId) }} — {{ p.diasTrabajados }} día(s) × {{ mxn(p.tarifaDiaria) }}</span>
+            <div class="flex items-center gap-3">
+              <span class="tabular-nums font-semibold">{{ mxn(p.diasTrabajados * p.tarifaDiaria) }}</span>
+              <button class="text-slate-400 hover:text-danger" @click="renglon.personal.splice(pidx, 1)">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-end gap-2 mt-2">
+          <div class="flex-1 min-w-[140px]">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Trabajador</label>
+            <select v-model.number="renglon.nuevoPersonal.trabajadorId" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" @change="precargarTarifa(renglon)">
+              <option :value="null" disabled>Elegir…</option>
+              <option v-for="t in trabajadores" :key="t.id" :value="t.id">{{ t.nombre }}{{ t.oficio ? ' · ' + t.oficio : '' }}</option>
+            </select>
+          </div>
+          <div class="w-24">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Días</label>
+            <input v-model.number="renglon.nuevoPersonal.diasTrabajados" type="number" inputmode="decimal" min="0" step="0.5" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" />
+          </div>
+          <div class="w-28">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Tarifa diaria</label>
+            <input v-model.number="renglon.nuevoPersonal.tarifaDiaria" type="number" inputmode="decimal" min="0" step="any" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" />
+          </div>
+          <button
+            type="button"
+            class="min-h-[42px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm"
+            :disabled="!renglon.nuevoPersonal.trabajadorId || !renglon.nuevoPersonal.diasTrabajados || !renglon.nuevoPersonal.tarifaDiaria"
+            @click="agregarPersonalRenglon(renglon)"
+          >
+            + Agregar
+          </button>
+          <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
+        </div>
+
+        <p class="text-sm font-bold mt-2">Total del renglón: {{ mxn(totalRenglon(renglon)) }}</p>
+
+        <div v-if="excedeRenglon(renglon)" class="mt-2.5 bg-red-50 border border-dashed border-danger rounded-md px-2.5 py-2">
+          <label class="text-[11px] font-bold text-danger block mb-1">
+            Justificación técnica obligatoria — excede saldo disponible por {{ (totalRenglon(renglon) / (renglon.costoUnitario || 1) - renglon.saldoDisponible).toFixed(2) }}
+          </label>
+          <textarea v-model="renglon.justificacion" rows="2" class="w-full border border-danger rounded-md px-2.5 py-1.5 text-sm" placeholder="Describe el motivo del excedente…" />
+        </div>
+      </div>
+
+      <p v-if="!renglonesNomina.length && obraId" class="text-sm text-slate-400 mb-3">Agrega un renglón de Mano de Obra con el botón de arriba.</p>
+
+      <p v-if="renglonesNomina.length" class="text-sm font-display mb-5">Total de Nómina: <b>{{ mxn(totalNomina) }}</b></p>
+
+      <!-- Modal: catálogo de insumos de Mano de Obra (+ dar de alta uno nuevo) -->
+      <div v-if="catalogoMdOAbierto" class="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-3" @click.self="catalogoMdOAbierto = false">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-lg max-h-[85vh] flex flex-col">
+          <div class="p-4 border-b border-slate-200 flex-none flex items-center justify-between">
+            <h3 class="font-display text-base">Rubros de Mano de Obra — {{ obraNombre }}</h3>
+            <button class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="catalogoMdOAbierto = false">✕</button>
+          </div>
+          <div class="overflow-y-auto p-4 flex-1">
+            <div v-if="insumosManoDeObraDisponibles.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 mb-4">
+              <button
+                v-for="s in insumosManoDeObraDisponibles"
+                :key="s.id"
+                type="button"
+                class="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 flex items-center justify-between gap-3"
+                @click="agregarRenglonNomina(s)"
+              >
+                <span><span class="font-semibold">{{ s.clave }}</span> · {{ s.descripcion }}</span>
+                <span class="tabular-nums text-slate-400 flex-none text-xs">saldo: {{ Number(s.saldo_disponible).toLocaleString('es-MX') }}</span>
+              </button>
+            </div>
+            <p v-else class="text-sm text-slate-400 mb-4">Ya agregaste todos los rubros de Mano de Obra existentes, o no hay ninguno aún.</p>
+
+            <button type="button" class="text-xs font-semibold text-primary underline" @click="mostrarInsumoNuevo = true">+ Dar de alta un rubro nuevo de Mano de Obra</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alta de insumo nuevo (Mano de Obra) — arranca con presupuesto en $0 a propósito -->
+      <div v-if="mostrarInsumoNuevo" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3" @click.self="mostrarInsumoNuevo = false">
+        <form class="bg-white rounded-xl shadow-lg w-full max-w-sm p-4" @submit.prevent="darDeAltaInsumo">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-display text-base">Nuevo rubro de Mano de Obra</h3>
+            <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="mostrarInsumoNuevo = false">✕</button>
+          </div>
+          <p class="text-xs text-slate-500 mb-3">Arranca con presupuesto en $0 — cualquier cargo mostrará "excede" hasta que Dirección autorice un estimado.</p>
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Clave</label>
+          <input v-model="insumoNuevo.clave" required placeholder="Ej. MO-004" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-3" />
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Descripción</label>
+          <input v-model="insumoNuevo.descripcion" required placeholder="Ej. Fierrero" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-3" />
+          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Tarifa diaria de referencia</label>
+          <input v-model.number="insumoNuevo.costoUnitarioReferencia" type="number" min="0.01" step="any" required class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-3" />
+          <p v-if="errorInsumoNuevo" class="text-xs text-danger mb-2">{{ errorInsumoNuevo }}</p>
+          <button type="submit" class="min-h-[44px] bg-primary text-white font-bold rounded-lg px-5 text-sm w-full" :disabled="guardandoInsumo">
+            {{ guardandoInsumo ? 'Guardando…' : '+ Agregar y seleccionar' }}
+          </button>
+        </form>
+      </div>
+    </template>
 
     <!-- Alta rápida de trabajador, sin salir de la requisición en progreso -->
     <div v-if="mostrarAltaTrabajador" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3" @click.self="mostrarAltaTrabajador = false">
@@ -274,10 +419,10 @@
     </div>
 
     <div class="flex gap-2.5">
-      <button class="min-h-[48px] border-[1.5px] border-slate-300 rounded-lg px-5 font-semibold text-sm" @click="guardar('borrador')" :disabled="!items.length || guardando || !personalListoParaGuardar">
+      <button class="min-h-[48px] border-[1.5px] border-slate-300 rounded-lg px-5 font-semibold text-sm" @click="guardar('borrador')" :disabled="!puedeGuardar || guardando">
         Guardar borrador
       </button>
-      <button class="min-h-[48px] bg-primary text-white rounded-lg px-5 font-bold text-sm" @click="guardar('enviar')" :disabled="!items.length || guardando || !personalListoParaGuardar">
+      <button class="min-h-[48px] bg-primary text-white rounded-lg px-5 font-bold text-sm" @click="guardar('enviar')" :disabled="!puedeGuardar || guardando">
         {{ guardando ? 'Guardando…' : 'Guardar y enviar a autorizar' }}
       </button>
     </div>
@@ -299,6 +444,7 @@ const etapaId = ref(null);
 const frenteId = ref(null);
 const partidaId = ref(null);
 const items = ref([]);
+const tipoRequisicion = ref('materiales'); // 'materiales' | 'nomina'
 const busqueda = ref('');
 const sugerencias = ref([]);
 const vista = ref('desktop');
@@ -345,7 +491,14 @@ async function cargarArbol() {
   obraId.value = data[0]?.id ?? null;
 }
 
-watch(obraId, () => { etapaId.value = etapas.value[0]?.id ?? null; items.value = []; catalogoInsumos.value = []; personal.value = []; });
+watch(obraId, () => {
+  etapaId.value = etapas.value[0]?.id ?? null;
+  items.value = [];
+  catalogoInsumos.value = [];
+  personal.value = [];
+  renglonesNomina.value = [];
+  insumosManoDeObra.value = [];
+});
 watch(etapaId, () => { frenteId.value = frentes.value[0]?.id ?? null; });
 watch(frenteId, () => { partidaId.value = partidas.value[0]?.id ?? null; });
 
@@ -448,40 +601,166 @@ function agregarPersonal() {
   nuevoPersonal.monto = null;
 }
 
+// --- Requisición de Nómina (Bloque 28) ---
+// Cada renglón es un rubro de Mano de Obra presupuestado; se desglosa en personal (días x tarifa
+// diaria). El total del renglón SIEMPRE es la suma de su propio desglose — nunca se captura a
+// mano — así nunca puede "no cuadrar". Una misma persona puede aparecer en varios renglones.
+const renglonesNomina = ref([]);
+const insumosManoDeObra = ref([]);
+const catalogoMdOAbierto = ref(false);
+const mostrarInsumoNuevo = ref(false);
+const insumoNuevo = reactive({ clave: '', descripcion: '', costoUnitarioReferencia: null });
+const errorInsumoNuevo = ref('');
+const guardandoInsumo = ref(false);
+
+const insumosManoDeObraDisponibles = computed(() =>
+  insumosManoDeObra.value.filter((s) => !renglonesNomina.value.some((r) => r.insumoId === s.id))
+);
+
+async function cargarInsumosManoDeObra() {
+  if (!obraId.value || insumosManoDeObra.value.length) return;
+  const { data } = await api.get(`/catalogo/obras/${obraId.value}/insumos`, { params: { todos: '1' } });
+  insumosManoDeObra.value = data.filter((s) => s.es_mano_de_obra);
+}
+
+function abrirCatalogoManoDeObra() {
+  catalogoMdOAbierto.value = true;
+  cargarInsumosManoDeObra();
+}
+
+function agregarRenglonNomina(s) {
+  renglonesNomina.value.push({
+    insumoId: s.id,
+    clave: s.clave,
+    descripcion: s.descripcion,
+    saldoDisponible: Number(s.saldo_disponible),
+    costoUnitario: Number(s.costo_unitario ?? 0),
+    justificacion: '',
+    personal: [],
+    nuevoPersonal: { trabajadorId: null, diasTrabajados: null, tarifaDiaria: null },
+  });
+  catalogoMdOAbierto.value = false;
+}
+
+function precargarTarifa(renglon) {
+  const t = trabajadores.value.find((tr) => tr.id === renglon.nuevoPersonal.trabajadorId);
+  if (t?.salario_referencia && !renglon.nuevoPersonal.tarifaDiaria) {
+    renglon.nuevoPersonal.tarifaDiaria = Number(t.salario_referencia);
+  }
+}
+
+function agregarPersonalRenglon(renglon) {
+  renglon.personal.push({ ...renglon.nuevoPersonal });
+  renglon.nuevoPersonal = { trabajadorId: null, diasTrabajados: null, tarifaDiaria: null };
+}
+
+function totalRenglon(renglon) {
+  return renglon.personal.reduce((acc, p) => acc + Number(p.diasTrabajados || 0) * Number(p.tarifaDiaria || 0), 0);
+}
+function excedeRenglon(renglon) {
+  if (!renglon.costoUnitario) return false;
+  const cantidadEquivalente = totalRenglon(renglon) / renglon.costoUnitario;
+  return cantidadEquivalente > renglon.saldoDisponible;
+}
+const totalNomina = computed(() => renglonesNomina.value.reduce((acc, r) => acc + totalRenglon(r), 0));
+
+async function darDeAltaInsumo() {
+  errorInsumoNuevo.value = '';
+  guardandoInsumo.value = true;
+  try {
+    const { data } = await api.post('/insumos', {
+      clave: insumoNuevo.clave,
+      descripcion: insumoNuevo.descripcion,
+      unidad: 'Jornal',
+      // Sin familiaId: el backend resuelve/crea la familia "Mano de Obra" automáticamente,
+      // así funciona igual aunque la obra no tenga todavía ningún rubro de MdO en su catálogo.
+      obraId: obraId.value,
+      costoUnitarioReferencia: insumoNuevo.costoUnitarioReferencia,
+    });
+    agregarRenglonNomina({
+      id: data.id, clave: data.clave, descripcion: data.descripcion,
+      saldo_disponible: 0, costo_unitario: insumoNuevo.costoUnitarioReferencia,
+    });
+    insumoNuevo.clave = '';
+    insumoNuevo.descripcion = '';
+    insumoNuevo.costoUnitarioReferencia = null;
+    mostrarInsumoNuevo.value = false;
+    insumosManoDeObra.value = []; // refrescar en el próximo abrir catálogo
+  } catch (err) {
+    errorInsumoNuevo.value = err.response?.data?.error || 'No se pudo crear el insumo.';
+  } finally {
+    guardandoInsumo.value = false;
+  }
+}
+
+const puedeGuardar = computed(() => {
+  if (tipoRequisicion.value === 'nomina') {
+    return renglonesNomina.value.length > 0 && renglonesNomina.value.every((r) => r.personal.length > 0) && personalListoParaGuardar.value;
+  }
+  return items.value.length > 0 && personalListoParaGuardar.value;
+});
+
 async function guardar(siguiente) {
   errorGeneral.value = '';
-  const faltantes = items.value.filter((i) => excede(i) && !i.justificacion?.trim());
-  if (faltantes.length) {
-    errorGeneral.value = `Falta justificación técnica en: ${faltantes.map((i) => i.descripcion).join(', ')}`;
-    return;
-  }
-  if (items.value.some((i) => !i.cantidadRequerida || i.cantidadRequerida <= 0)) {
-    errorGeneral.value = 'Captura una cantidad requerida mayor a cero en cada insumo.';
-    return;
-  }
-  if (items.value.some((i) => !i.precioUnitario || i.precioUnitario <= 0)) {
-    errorGeneral.value = 'Captura un precio unitario mayor a cero en cada insumo.';
-    return;
-  }
-  if (montoManoDeObra.value > 0 && personal.value.length > 0 && !personalCuadra.value) {
-    errorGeneral.value = `El personal asignado (${mxn(sumaPersonal.value)}) no coincide con el total de Mano de Obra (${mxn(montoManoDeObra.value)}).`;
-    return;
+  let payload;
+
+  if (tipoRequisicion.value === 'nomina') {
+    const faltantesJust = renglonesNomina.value.filter((r) => excedeRenglon(r) && !r.justificacion?.trim());
+    if (faltantesJust.length) {
+      errorGeneral.value = `Falta justificación técnica en: ${faltantesJust.map((r) => r.descripcion).join(', ')}`;
+      return;
+    }
+    if (renglonesNomina.value.some((r) => r.personal.length === 0)) {
+      errorGeneral.value = 'Cada renglón necesita al menos una persona con días y tarifa capturados.';
+      return;
+    }
+    payload = {
+      tipo: 'nomina',
+      obraId: obraId.value,
+      etapaId: etapaId.value,
+      frenteId: frenteId.value,
+      partidaId: partidaId.value,
+      items: renglonesNomina.value.map((r) => ({
+        insumoId: r.insumoId,
+        justificacion: r.justificacion || null,
+        personal: r.personal.map((p) => ({ trabajadorId: p.trabajadorId, diasTrabajados: p.diasTrabajados, tarifaDiaria: p.tarifaDiaria })),
+      })),
+    };
+  } else {
+    const faltantes = items.value.filter((i) => excede(i) && !i.justificacion?.trim());
+    if (faltantes.length) {
+      errorGeneral.value = `Falta justificación técnica en: ${faltantes.map((i) => i.descripcion).join(', ')}`;
+      return;
+    }
+    if (items.value.some((i) => !i.cantidadRequerida || i.cantidadRequerida <= 0)) {
+      errorGeneral.value = 'Captura una cantidad requerida mayor a cero en cada insumo.';
+      return;
+    }
+    if (items.value.some((i) => !i.precioUnitario || i.precioUnitario <= 0)) {
+      errorGeneral.value = 'Captura un precio unitario mayor a cero en cada insumo.';
+      return;
+    }
+    if (montoManoDeObra.value > 0 && personal.value.length > 0 && !personalCuadra.value) {
+      errorGeneral.value = `El personal asignado (${mxn(sumaPersonal.value)}) no coincide con el total de Mano de Obra (${mxn(montoManoDeObra.value)}).`;
+      return;
+    }
+    payload = {
+      tipo: 'materiales',
+      obraId: obraId.value,
+      etapaId: etapaId.value,
+      frenteId: frenteId.value,
+      partidaId: partidaId.value,
+      items: items.value.map((i) => ({
+        insumoId: i.insumoId,
+        cantidadRequerida: i.cantidadRequerida,
+        precioUnitario: i.precioUnitario,
+        justificacion: i.justificacion || null,
+      })),
+      personal: personal.value,
+    };
   }
 
   guardando.value = true;
-  const payload = {
-    obraId: obraId.value,
-    etapaId: etapaId.value,
-    frenteId: frenteId.value,
-    partidaId: partidaId.value,
-    items: items.value.map((i) => ({
-      insumoId: i.insumoId,
-      cantidadRequerida: i.cantidadRequerida,
-      precioUnitario: i.precioUnitario,
-      justificacion: i.justificacion || null,
-    })),
-    personal: personal.value,
-  };
 
   try {
     const { data } = await api.post('/requisiciones', payload);
