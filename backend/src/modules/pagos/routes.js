@@ -3,6 +3,16 @@ import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
 import { actualizarEstatusPagoFactura } from '../facturas/routes.js';
 
+// Bloque 16: candado de cambio de precio — no se le puede aplicar un pago a una factura con
+// variación de precio ≥5% sobre lo negociado en la OC hasta que Dirección la autorice.
+const UMBRAL_VARIACION_PRECIO = 0.05;
+const EXCEDE_VARIACION_SQL = `EXISTS (
+  SELECT 1 FROM factura_detalle fd
+  JOIN oc_detalle od ON od.oc_id = f.oc_id AND od.insumo_id = fd.insumo_id
+  WHERE fd.factura_id = f.id AND od.precio_negociado > 0
+    AND fd.precio_unitario > od.precio_negociado * (1 + ${UMBRAL_VARIACION_PRECIO})
+)`;
+
 async function cargarPagoCompleto(client, id) {
   const { rows: cab } = await client.query(
     `SELECT p.*, pr.razon_social AS proveedor_nombre, u.nombre AS registro_nombre
@@ -49,8 +59,9 @@ export default async function pagosRoutes(app) {
   app.get('/api/proveedores/:id/estado-cuenta', async (request) => {
     const { id } = request.params;
     const { rows: facturas } = await pool.query(
-      `SELECT f.id, f.folio, f.total, f.moneda, f.fecha, f.estatus_pago,
-              (SELECT COALESCE(SUM(monto_aplicado), 0) FROM pago_factura WHERE factura_id = f.id) AS monto_pagado
+      `SELECT f.id, f.folio, f.total, f.moneda, f.fecha, f.estatus_pago, f.variacion_precio_autorizada,
+              (SELECT COALESCE(SUM(monto_aplicado), 0) FROM pago_factura WHERE factura_id = f.id) AS monto_pagado,
+              ${EXCEDE_VARIACION_SQL} AS excede_variacion_precio
        FROM facturas f WHERE f.proveedor_id = $1 ORDER BY f.fecha DESC`,
       [id]
     );
@@ -78,23 +89,32 @@ export default async function pagosRoutes(app) {
     try {
       const resultado = await withTransaction(async (client) => {
         const { rows: facturas } = await client.query(
-          `SELECT f.id, f.total, f.proveedor_id,
-                  (SELECT COALESCE(SUM(monto_aplicado), 0) FROM pago_factura WHERE factura_id = f.id) AS ya_pagado
+          `SELECT f.id, f.total, f.proveedor_id, f.folio, f.variacion_precio_autorizada,
+                  (SELECT COALESCE(SUM(monto_aplicado), 0) FROM pago_factura WHERE factura_id = f.id) AS ya_pagado,
+                  ${EXCEDE_VARIACION_SQL} AS excede_variacion_precio
            FROM facturas f WHERE f.id = ANY($1::int[]) FOR UPDATE`,
           [aplicaciones.map((a) => a.facturaId)]
         );
         const porFactura = new Map(facturas.map((f) => [f.id, f]));
 
         const invalidas = [];
+        const pendientesAutorizacion = [];
         for (const ap of aplicaciones) {
           const f = porFactura.get(ap.facturaId);
           const saldo = f ? Number(f.total) - Number(f.ya_pagado) : 0;
           if (!f || f.proveedor_id !== Number(proveedorId) || Number(ap.montoAplicado) > saldo + 0.01) {
             invalidas.push({ facturaId: ap.facturaId, saldoDisponible: saldo });
+            continue;
+          }
+          if (f.excede_variacion_precio && !f.variacion_precio_autorizada) {
+            pendientesAutorizacion.push({ facturaId: ap.facturaId, folio: f.folio });
           }
         }
         if (invalidas.length > 0) {
           throw Object.assign(new Error('SALDO_INSUFICIENTE'), { code: 422, detalle: invalidas });
+        }
+        if (pendientesAutorizacion.length > 0) {
+          throw Object.assign(new Error('VARIACION_PENDIENTE'), { code: 422, detalle: pendientesAutorizacion });
         }
 
         const folio = await siguienteFolio(client, 'PAG', 'pagos_folio_seq');
@@ -122,6 +142,12 @@ export default async function pagosRoutes(app) {
 
       return reply.code(201).send(resultado);
     } catch (err) {
+      if (err.message === 'VARIACION_PENDIENTE') {
+        return reply.code(422).send({
+          error: 'Una o más facturas tienen variación de precio ≥5% sobre lo negociado, pendiente de autorización de Dirección',
+          detalle: err.detalle,
+        });
+      }
       if (err.code === 422) return reply.code(422).send({ error: 'Una o más facturas no tienen saldo suficiente para aplicar ese monto', detalle: err.detalle });
       request.log.error(err);
       return reply.code(500).send({ error: 'No se pudo registrar el pago' });

@@ -39,10 +39,20 @@
         </thead>
         <tbody>
           <tr v-for="f in facturasConSaldo" :key="f.id" class="border-t border-slate-200">
-            <td class="px-4 py-2.5 font-semibold">{{ f.folio }}</td>
+            <td class="px-4 py-2.5 font-semibold">
+              {{ f.folio }}
+              <span v-if="bloqueadaPorVariacion(f)" class="block text-[10px] font-bold text-danger normal-case">▲ Variación de precio sin autorizar</span>
+            </td>
             <td class="px-4 py-2.5">{{ mxn(f.total) }}</td>
             <td class="px-4 py-2.5">{{ mxn(f.saldo) }}</td>
-            <td class="px-4 py-2.5"><input v-model.number="aplicaciones[f.id]" type="number" inputmode="decimal" min="0" :max="f.saldo" step="any" class="w-28 border border-slate-300 rounded px-2 py-1.5" /></td>
+            <td class="px-4 py-2.5">
+              <input
+                v-model.number="aplicaciones[f.id]"
+                type="number" inputmode="decimal" min="0" :max="f.saldo" step="any"
+                :disabled="bloqueadaPorVariacion(f)"
+                class="w-28 border border-slate-300 rounded px-2 py-1.5 disabled:bg-slate-100 disabled:text-slate-400"
+              />
+            </td>
           </tr>
           <tr v-if="proveedorId && facturasConSaldo.length === 0">
             <td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm font-sans">Este proveedor no tiene facturas con saldo pendiente.</td>
@@ -78,9 +88,14 @@ const guardando = ref(false);
 
 const sumaAplicada = computed(() => facturasConSaldo.value.reduce((s, f) => s + Number(aplicaciones[f.id] || 0), 0));
 
+function bloqueadaPorVariacion(f) {
+  return f.excede_variacion_precio && !f.variacion_precio_autorizada;
+}
+
 const puedeGuardar = computed(() => {
   if (!proveedorId.value || !monto.value || !formaPago.value.trim()) return false;
   if (sumaAplicada.value <= 0 || sumaAplicada.value > Number(monto.value) + 0.01) return false;
+  if (facturasConSaldo.value.some((f) => bloqueadaPorVariacion(f) && aplicaciones[f.id] > 0)) return false;
   return facturasConSaldo.value.every((f) => !aplicaciones[f.id] || aplicaciones[f.id] <= f.saldo + 0.01);
 });
 

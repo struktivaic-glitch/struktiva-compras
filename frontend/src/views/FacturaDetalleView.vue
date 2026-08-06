@@ -21,6 +21,18 @@
         <a v-if="factura.pdf_url" :href="factura.pdf_url" target="_blank" class="text-xs font-semibold text-primary underline">Descargar PDF</a>
       </div>
 
+      <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 mb-4">{{ error }}</p>
+
+      <div v-if="factura.hayVariacionSinAutorizar" class="bg-amber-50 border border-warning/30 text-warning text-sm rounded-lg px-4 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+        <span>Uno o más insumos están 5% o más arriba de lo negociado en la OC. Se necesita autorización de Dirección antes de poder pagarse.</span>
+        <button v-if="auth.rol === 'direccion'" class="min-h-[36px] bg-primary text-white text-xs font-bold rounded-lg px-3 flex-none" @click="firmaAbierta = true">
+          Autorizar variación de precio
+        </button>
+      </div>
+      <p v-else-if="factura.variacion_precio_autorizada" class="bg-emerald-50 border border-success/30 text-success text-xs rounded-lg px-4 py-2 mb-4">
+        Variación de precio autorizada por Dirección.
+      </p>
+
       <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl mb-5">
         <table class="w-full text-sm tabular-nums">
           <thead>
@@ -35,7 +47,10 @@
             <tr v-for="d in factura.detalle" :key="d.id" class="border-t border-slate-200">
               <td class="px-4 py-2.5 font-sans font-semibold">{{ d.clave }} · {{ d.descripcion }}</td>
               <td class="px-4 py-2.5">{{ d.cantidad }} {{ d.unidad }}</td>
-              <td class="px-4 py-2.5">{{ mxn(d.precio_unitario) }}</td>
+              <td class="px-4 py-2.5">
+                {{ mxn(d.precio_unitario) }}
+                <span v-if="d.excede_variacion_precio" class="block text-[10px] font-bold text-danger">▲ {{ d.variacion_pct }}% sobre lo negociado</span>
+              </td>
               <td class="px-4 py-2.5">{{ mxn(d.cantidad * d.precio_unitario) }}</td>
             </tr>
           </tbody>
@@ -59,6 +74,8 @@
           </tfoot>
         </table>
       </div>
+
+      <FirmaModal v-if="firmaAbierta" etiqueta="Autorizar variación de precio de la factura" @firmado="autorizarVariacion" @cerrar="firmaAbierta = false" ref="firmaModalRef" />
     </template>
   </AppShell>
 </template>
@@ -68,10 +85,26 @@ import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import BotonVolver from '../components/BotonVolver.vue';
+import FirmaModal from '../components/FirmaModal.vue';
 import { api } from '../lib/api.js';
+import { useAuthStore } from '../stores/auth.js';
 
+const auth = useAuthStore();
 const route = useRoute();
 const factura = ref(null);
+const error = ref('');
+const firmaAbierta = ref(false);
+const firmaModalRef = ref(null);
+
+async function autorizarVariacion(firma) {
+  try {
+    const { data } = await api.post(`/facturas/${route.params.id}/autorizar-variacion`, { firma });
+    factura.value = data;
+    firmaAbierta.value = false;
+  } catch (err) {
+    firmaModalRef.value?.mostrarError(err.response?.data?.error || 'No se pudo autorizar la variación.');
+  }
+}
 
 function mxn(n) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);

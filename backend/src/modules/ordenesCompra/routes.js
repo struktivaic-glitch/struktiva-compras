@@ -1,6 +1,15 @@
 import { pool, withTransaction } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
+import { registrarFirma } from '../../lib/firma.js';
+import { notificarPorRol } from '../../lib/notificaciones.js';
+
+// Bloque 16: OC < $20,000 las confirma Compras directamente (ya respaldadas por la autorización
+// de la requisición). OC >= $20,000 requieren autorización de Dirección, o como excepción — para
+// cuando Dirección no pueda firmar (vacaciones, juntas, viaje sin conexión) — dos firmas de
+// Administrador + Superintendente. Reglas confirmadas por el usuario.
+const UMBRAL_AUTORIZACION_MONTO = 20000;
+const ROLES_EXCEPCION_DOS_FIRMAS = ['administrador', 'superintendente'];
 
 async function cargarOcCompleta(client, id) {
   const { rows: cab } = await client.query(
@@ -31,7 +40,31 @@ async function cargarOcCompleta(client, id) {
     [id]
   );
 
-  return { ...cab[0], detalle, requisiciones };
+  const importeTotal = detalle.reduce((s, d) => s + Number(d.cantidad_pedida) * Number(d.precio_negociado), 0);
+  const requiereAutorizacionMonto = importeTotal >= UMBRAL_AUTORIZACION_MONTO;
+
+  let firmasExcepcion = [];
+  if (requiereAutorizacionMonto) {
+    const { rows } = await client.query(
+      `SELECT DISTINCT ON (r.clave) f.usuario_id, u.nombre, r.clave AS rol, f.tipo, f.creado_en
+       FROM firmas f
+       JOIN usuarios u ON u.id = f.usuario_id
+       JOIN roles r ON r.id = u.rol_id
+       WHERE f.entidad_tipo = 'orden_compra_autorizacion' AND f.entidad_id = $1 AND r.clave = ANY($2::text[])
+       ORDER BY r.clave, f.creado_en ASC`,
+      [id, ROLES_EXCEPCION_DOS_FIRMAS]
+    );
+    firmasExcepcion = rows;
+  }
+
+  return {
+    ...cab[0],
+    detalle,
+    requisiciones,
+    importe_total: importeTotal,
+    requiere_autorizacion_monto: requiereAutorizacionMonto,
+    firmas_excepcion: firmasExcepcion,
+  };
 }
 
 export default async function ordenesCompraRoutes(app) {
@@ -137,7 +170,18 @@ export default async function ordenesCompraRoutes(app) {
             accion: 'generar_desde_cotizacion', despues: { folio, procesoId, proveedorId },
           });
 
-          ocsCreadas.push(await cargarOcCompleta(client, ocId));
+          const ocCompleta = await cargarOcCompleta(client, ocId);
+          if (ocCompleta.requiere_autorizacion_monto) {
+            await notificarPorRol(client, {
+              roles: ['direccion', ...ROLES_EXCEPCION_DOS_FIRMAS],
+              categoria: 'orden_compra',
+              entidadTipo: 'orden_compra',
+              entidadId: ocId,
+              titulo: `${folio} requiere autorización ($${ocCompleta.importe_total.toLocaleString('es-MX')})`,
+              mensaje: `Orden de Compra por $${ocCompleta.importe_total.toLocaleString('es-MX')} — mayor o igual a $${UMBRAL_AUTORIZACION_MONTO.toLocaleString('es-MX')}, requiere tu autorización antes de poder confirmarse.`,
+            });
+          }
+          ocsCreadas.push(ocCompleta);
         }
 
         return ocsCreadas;
@@ -160,6 +204,18 @@ export default async function ordenesCompraRoutes(app) {
       if (!rows[0]) return { error: 404 };
       if (rows[0].estatus !== 'borrador') return { error: 409, mensaje: 'Solo una OC en borrador puede confirmarse' };
 
+      const { rows: importeRows } = await client.query(
+        `SELECT COALESCE(SUM(cantidad_pedida * precio_negociado), 0) AS importe_total FROM oc_detalle WHERE oc_id = $1`,
+        [id]
+      );
+      const importeTotal = Number(importeRows[0].importe_total);
+      if (importeTotal >= UMBRAL_AUTORIZACION_MONTO) {
+        return {
+          error: 422,
+          mensaje: `Esta OC es de $${importeTotal.toLocaleString('es-MX')}, igual o mayor a $${UMBRAL_AUTORIZACION_MONTO.toLocaleString('es-MX')} — requiere autorización de Dirección, o la excepción de dos firmas (Administrador + Superintendente).`,
+        };
+      }
+
       await client.query(
         "UPDATE ordenes_compra SET estatus = 'confirmada', confirmada_en = now() WHERE id = $1",
         [id]
@@ -173,6 +229,83 @@ export default async function ordenesCompraRoutes(app) {
 
     if (resultado.error === 404) return reply.code(404).send({ error: 'Orden de compra no encontrada' });
     if (resultado.error === 409) return reply.code(409).send({ error: resultado.mensaje });
+    if (resultado.error === 422) return reply.code(422).send({ error: resultado.mensaje });
     return cargarOcCompleta(pool, id);
+  });
+
+  // Bloque 16: autorización de OC >= $20,000. Dirección la autoriza sola (una firma) o, como
+  // excepción, se completa con dos firmas de Administrador + Superintendente.
+  app.post('/api/ordenes-compra/:id/autorizar-monto', { preHandler: app.requireRole('direccion', ...ROLES_EXCEPCION_DOS_FIRMAS) }, async (request, reply) => {
+    const { id } = request.params;
+    const { firma } = request.body ?? {};
+    try {
+      const resultado = await withTransaction(async (client) => {
+        const { rows } = await client.query('SELECT estatus FROM ordenes_compra WHERE id = $1 FOR UPDATE', [id]);
+        if (!rows[0]) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
+        if (rows[0].estatus !== 'borrador') throw Object.assign(new Error('NO_BORRADOR'), { code: 409 });
+
+        const { rows: importeRows } = await client.query(
+          `SELECT COALESCE(SUM(cantidad_pedida * precio_negociado), 0) AS importe_total FROM oc_detalle WHERE oc_id = $1`,
+          [id]
+        );
+        const importeTotal = Number(importeRows[0].importe_total);
+        if (importeTotal < UMBRAL_AUTORIZACION_MONTO) throw Object.assign(new Error('NO_APLICA'), { code: 409 });
+
+        if (request.user.rol === 'direccion') {
+          await registrarFirma(client, { request, entidadTipo: 'orden_compra_autorizacion', entidadId: id, firma });
+          await client.query("UPDATE ordenes_compra SET estatus = 'confirmada', confirmada_en = now() WHERE id = $1", [id]);
+          await registrarBitacora(client, {
+            tabla: 'ordenes_compra', registroId: id, usuarioId: request.user.sub, accion: 'autorizar_monto',
+            despues: { via: 'direccion', importeTotal },
+          });
+          return { completado: true };
+        }
+
+        // Excepción de dos firmas: Administrador + Superintendente (para cuando Dirección no
+        // pueda firmar). request.user.rol aquí solo puede ser uno de ROLES_EXCEPCION_DOS_FIRMAS
+        // por el requireRole del endpoint.
+        const { rows: firmasPrevias } = await client.query(
+          `SELECT DISTINCT r.clave FROM firmas f
+           JOIN usuarios u ON u.id = f.usuario_id
+           JOIN roles r ON r.id = u.rol_id
+           WHERE f.entidad_tipo = 'orden_compra_autorizacion' AND f.entidad_id = $1 AND r.clave = ANY($2::text[])`,
+          [id, ROLES_EXCEPCION_DOS_FIRMAS]
+        );
+        const rolesYaFirmados = new Set(firmasPrevias.map((f) => f.clave));
+        if (rolesYaFirmados.has(request.user.rol)) {
+          throw Object.assign(new Error('YA_FIRMASTE'), { code: 409 });
+        }
+
+        await registrarFirma(client, { request, entidadTipo: 'orden_compra_autorizacion', entidadId: id, firma });
+        rolesYaFirmados.add(request.user.rol);
+
+        const faltaCompletar = ROLES_EXCEPCION_DOS_FIRMAS.some((r) => !rolesYaFirmados.has(r));
+        if (!faltaCompletar) {
+          await client.query("UPDATE ordenes_compra SET estatus = 'confirmada', confirmada_en = now() WHERE id = $1", [id]);
+          await registrarBitacora(client, {
+            tabla: 'ordenes_compra', registroId: id, usuarioId: request.user.sub, accion: 'autorizar_monto',
+            despues: { via: 'excepcion_dos_firmas', importeTotal },
+          });
+          return { completado: true };
+        }
+
+        const faltaRol = ROLES_EXCEPCION_DOS_FIRMAS.find((r) => !rolesYaFirmados.has(r));
+        return { completado: false, faltaRol };
+      });
+
+      const oc = await cargarOcCompleta(pool, id);
+      return { ...oc, _autorizacion: resultado };
+    } catch (err) {
+      if (err.code === 404) return reply.code(404).send({ error: 'Orden de compra no encontrada' });
+      if (err.code === 409 && err.message === 'NO_BORRADOR') return reply.code(409).send({ error: 'Solo una OC en borrador puede autorizarse' });
+      if (err.code === 409 && err.message === 'NO_APLICA') return reply.code(409).send({ error: 'Esta OC no requiere autorización por monto (menor a $20,000); puede confirmarse directamente' });
+      if (err.code === 409 && err.message === 'YA_FIRMASTE') return reply.code(409).send({ error: 'Ya registraste tu firma; falta la del otro rol requerido' });
+      if (err.message === 'FIRMA_REQUERIDA') return reply.code(400).send({ error: 'Se requiere firma (táctil o PIN) para autorizar' });
+      if (err.message === 'SIN_PIN_CONFIGURADO') return reply.code(400).send({ error: 'Aún no configuras tu PIN de firma. Ve a tu perfil para crearlo.' });
+      if (err.message === 'PIN_INCORRECTO') return reply.code(422).send({ error: 'PIN incorrecto' });
+      if (err.message === 'FIRMA_TACTIL_INVALIDA') return reply.code(400).send({ error: 'La firma táctil capturada no es válida, intenta de nuevo' });
+      request.log.error(err);
+      return reply.code(500).send({ error: 'No se pudo registrar la autorización' });
+    }
   });
 }

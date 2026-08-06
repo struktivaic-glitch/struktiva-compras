@@ -21,6 +21,16 @@
       <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4 no-print">{{ error }}</p>
       <p v-if="aviso" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 my-4 no-print">{{ aviso }}</p>
 
+      <div v-if="proceso.hayVariacionSinAutorizar" class="bg-amber-50 border border-warning/30 text-warning text-sm rounded-lg px-4 py-3 my-4 no-print flex items-center justify-between flex-wrap gap-2">
+        <span>Hay insumos con precio 5% o más arriba del presupuesto. Se necesita autorización de Dirección antes de poder cerrar.</span>
+        <button v-if="auth.rol === 'direccion'" class="min-h-[36px] bg-primary text-white text-xs font-bold rounded-lg px-3 flex-none" @click="firmaAbierta = true">
+          Autorizar variación de precio
+        </button>
+      </div>
+      <p v-else-if="proceso.variacion_precio_autorizada" class="bg-emerald-50 border border-success/30 text-success text-xs rounded-lg px-4 py-2 my-4 no-print">
+        Variación de precio autorizada por Dirección.
+      </p>
+
       <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 mb-6">
         <ReportePrintHeader
           :titulo="`Cuadro comparativo ${proceso.folio}`"
@@ -61,6 +71,9 @@
                 </select>
                 <span v-else class="text-success text-xs font-bold">{{ nombreGanador(ins.id) || (proceso.estatus === 'cerrado' ? '—' : 'Pendiente de elegir') }}</span>
                 <span v-if="proceso.estatus !== 'cerrado' && puedeComprar" class="print-only text-success text-xs font-bold">{{ nombreGanador(ins.id) || 'Pendiente de elegir' }}</span>
+                <span v-if="variacionDe(ins.id)" class="block text-[10px] font-bold text-danger mt-0.5">
+                  ▲ {{ variacionDe(ins.id).variacion_pct }}% sobre presupuesto
+                </span>
               </td>
             </tr>
           </tbody>
@@ -119,6 +132,8 @@
       </template>
 
       <p v-else class="text-xs text-slate-400 no-print">Solo Compras/Dirección pueden agregar cotizaciones, cerrar el cuadro o generar la Orden de Compra.</p>
+
+      <FirmaModal v-if="firmaAbierta" etiqueta="Autorizar variación de precio del cuadro comparativo" @firmado="autorizarVariacion" @cerrar="firmaAbierta = false" ref="firmaModalRef" />
     </template>
   </AppShell>
 </template>
@@ -129,6 +144,7 @@ import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import BotonVolver from '../components/BotonVolver.vue';
 import ReportePrintHeader from '../components/ReportePrintHeader.vue';
+import FirmaModal from '../components/FirmaModal.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
@@ -193,6 +209,24 @@ function nombreGanador(insumoId) {
   const opts = opcionesGanador(insumoId);
   const detalleId = ganadorPorInsumo.value[insumoId];
   return opts.find((o) => o.detalleId === detalleId)?.proveedor ?? '—';
+}
+
+function variacionDe(insumoId) {
+  const g = (proceso.value?.ganadores ?? []).find((g) => g.insumo_id === insumoId);
+  return g?.excede_variacion_precio ? g : null;
+}
+
+const firmaAbierta = ref(false);
+const firmaModalRef = ref(null);
+
+async function autorizarVariacion(firma) {
+  try {
+    const { data } = await api.post(`/cotizaciones/${route.params.id}/autorizar-variacion`, { firma });
+    proceso.value = data;
+    firmaAbierta.value = false;
+  } catch (err) {
+    firmaModalRef.value?.mostrarError(err.response?.data?.error || 'No se pudo autorizar la variación.');
+  }
 }
 
 async function cargar() {

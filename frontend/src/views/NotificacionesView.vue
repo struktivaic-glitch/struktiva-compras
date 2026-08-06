@@ -63,8 +63,8 @@ const router = useRouter();
 const CATEGORIAS = [
   { clave: 'requisicion', label: 'Requisiciones', descripcion: 'Requisiciones pendientes de tu autorización.', ruta: '/requisiciones' },
   { clave: 'excedente', label: 'Excedente', descripcion: 'Ajustes de presupuesto excedido autorizados por Superintendencia o Dirección.', ruta: '/requisiciones' },
-  { clave: 'orden_compra', label: 'Órdenes de compra', descripcion: 'Sin candado de autorización todavía — categoría preparada para cuando se defina el flujo.', ruta: '/ordenes-compra' },
-  { clave: 'cambio_precio', label: 'Cambio de precio', descripcion: 'Variaciones de precio en cotizaciones y facturas que requieren autorización (próximamente).', ruta: '/cotizaciones' },
+  { clave: 'orden_compra', label: 'Órdenes de compra', descripcion: 'Órdenes de compra de $20,000 o más, pendientes de autorización de Dirección (o excepción de dos firmas).', ruta: '/ordenes-compra' },
+  { clave: 'cambio_precio', label: 'Cambio de precio', descripcion: 'Variaciones de precio (5% o más) en cotizaciones y facturas, pendientes de autorización de Dirección.', ruta: '/cotizaciones' },
   { clave: 'cancelacion', label: 'Cancelaciones', descripcion: 'Avisos informativos de requisiciones canceladas.', ruta: '/requisiciones' },
   { clave: 'incidencia', label: 'Incidencias', descripcion: 'Faltas, permisos, vacaciones e incapacidades pendientes de autorización.', ruta: '/incidencias' },
 ];
@@ -99,12 +99,21 @@ async function marcarTodasLeidas() {
   await Promise.all([cargarResumen(), cargarLista()]);
 }
 
+const RUTA_POR_ENTIDAD = {
+  cotizacion: (id) => `/cotizaciones/${id}`,
+  factura: (id) => `/facturas/${id}`,
+  orden_compra: (id) => `/ordenes-compra/${id}`,
+  requisicion: (id) => `/requisiciones/${id}`,
+};
+
 async function irA(n) {
   if (!n.leida) {
     await api.post(`/notificaciones/${n.id}/leida`);
     n.leida = true;
     await cargarResumen();
   }
+  const rutaEntidad = n.entidad_tipo && n.entidad_id ? RUTA_POR_ENTIDAD[n.entidad_tipo]?.(n.entidad_id) : null;
+  if (rutaEntidad) return router.push(rutaEntidad);
   const cat = CATEGORIAS.find((c) => c.clave === n.categoria);
   if (cat) router.push(cat.ruta);
 }

@@ -464,3 +464,40 @@ cambio de estructura de base de datos.
     autorización con firma, consumo de presupuesto verificado), y después repetido igual en el
     navegador de punta a punta (crear renglones, dar de alta un rubro nuevo desde la UI, ver el
     árbol en la impresión) — datos de prueba eliminados después en ambas rondas.
+- **Bloque 16** (06/08/2026): candado real de "Cambio de precio" (Cotizaciones y Facturas) y
+  autorización por monto en Órdenes de Compra — quedaba pendiente desde el Bloque 15. Reglas
+  confirmadas por el usuario: 5% de desviación ARRIBA del presupuestado/negociado dispara la
+  alerta y pide autorización de Dirección; OC menores a $20,000 las confirma Compras directo (ya
+  vienen respaldadas por la autorización de la requisición); OC de $20,000 o más requieren
+  autorización de Dirección, o como excepción — para cuando Dirección no pueda firmar (vacaciones,
+  juntas, viaje sin conexión) — dos firmas de **Administrador** (rol nuevo, creado para esto) +
+  Superintendente.
+  - Migración 021: nuevo rol `administrador`; `procesos_cotizacion` y `facturas` ganan
+    `variacion_precio_autorizada` (+ por/en).
+  - Cotizaciones: al marcar un ganador que cotiza 5%+ arriba del presupuesto de esa obra/insumo,
+    se notifica a Dirección (categoría "Cambio de precio") y se bloquea "Cerrar cuadro
+    comparativo" hasta que Dirección autorice con firma (`POST /:id/autorizar-variacion`).
+  - Facturas: si algún renglón factura 5%+ arriba de lo negociado en la OC (three-way matching,
+    ahora también de precio y no solo de cantidad), se notifica a Dirección y se bloquea que esa
+    factura reciba un pago hasta que se autorice (`POST /:id/autorizar-variacion`) — el registro
+    de la factura en sí no se bloquea, solo aplicarle un pago.
+  - Órdenes de Compra: `cargarOcCompleta` calcula `importe_total` y `requiere_autorizacion_monto`
+    (>= $20,000); `POST /:id/confirmar` ahora rechaza directo (comprador) si aplica el umbral.
+    Nuevo `POST /:id/autorizar-monto`: si firma Dirección, confirma con una sola firma; si firma
+    Administrador o Superintendente, queda "1 de 2" hasta que firme el otro rol (reutiliza la
+    tabla `firmas` genérica, `entidad_tipo='orden_compra_autorizacion'`) — con guardas para que
+    el mismo usuario no pueda contar como las dos firmas y para que roles sin permiso (ej.
+    Residente) no puedan autorizar.
+  - Bug encontrado y corregido durante las pruebas: en Postgres, `poi.costo_unitario * (1 + $2)`
+    sin cast explícito hace que el parámetro se infiera como `integer` (por el literal `1`) y
+    truena al mandar `0.05` — se resolvió con `(1 + $2::numeric)` en las 3 consultas afectadas.
+  - De paso se encontraron y limpiaron 13 notificaciones huérfanas (apuntaban a requisiciones ya
+    borradas en limpiezas de pruebas de bloques anteriores) que inflaban con badges falsos la
+    pantalla de Notificaciones — no relacionado al candado nuevo, pero visible justo ahí.
+  - Probado de punta a punta contra Neon (API): variación de precio en cotización (9.5% arriba,
+    bloqueo de cierre, autorización de Dirección, cierre exitoso después), variación de precio en
+    factura (12.9% arriba, bloqueo de pago, autorización, pago exitoso después), y los tres
+    caminos de autorización de OC (Dirección sola, excepción de dos firmas Administrador+
+    Superintendente completa correctamente, y los candados de rol — 403 para roles sin permiso,
+    409 al intentar firmar dos veces) — datos de prueba eliminados después, dejando intactos
+    tanto los datos reales del usuario como una cotización previa ajena a esta prueba.

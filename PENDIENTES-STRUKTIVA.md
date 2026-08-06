@@ -91,12 +91,14 @@ proyecto).
       cada persona del equipo lo vincule por su cuenta: entrar a **Perfil** dentro del sistema →
       "Vincular Telegram" → se abre Telegram con un mensaje precargado → dar "Enviar" → listo.
       Toma 10 segundos por persona, nadie necesita que yo intervenga.
-- [ ] **Reglas de negocio pendientes de definir** para el candado de "Cambio de precio" (Bloque
-      16): ¿qué % de variación entre el precio cotizado/facturado y el presupuestado debe
-      detener el proceso?, y ¿quién lo autoriza (propongo Dirección, confírmalo o cámbialo)?
-- [ ] **Órdenes de Compra**: dijiste que lo vas a analizar — cuando decidas si Compras las puede
-      confirmar solo o necesitan autorización de Dirección, lo construimos.
+- [x] **Candado de "Cambio de precio" (Bloque 16)** — construido y probado: 5% de desviación
+      arriba del presupuestado/negociado bloquea (cerrar cotización / pagar factura) hasta que
+      Dirección autorice con firma.
+- [x] **Candado de Órdenes de Compra (Bloque 16)** — construido y probado: OC menores a $20,000
+      las confirma Compras directo; OC de $20,000 o más requieren autorización de Dirección, o
+      como excepción — para cuando Dirección no pueda firmar — dos firmas de **Administrador**
+      (rol nuevo, dalo de alta en `/usuarios`) + Superintendente.
 
 ---
-*Última actualización: Bloque 15 (sistema de notificaciones — campanita + página por categorías)
-— 04/08/2026. Detalle completo de cada bloque en `NOTAS.md`.*
+*Última actualización: Bloque 16 (candado de cambio de precio + autorización por monto de
+Órdenes de Compra) — 06/08/2026. Detalle completo de cada bloque en `NOTAS.md`.*

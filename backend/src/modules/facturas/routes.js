@@ -2,6 +2,12 @@ import { pool, withTransaction } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
 import { guardarArchivo } from '../../lib/storage.js';
+import { registrarFirma } from '../../lib/firma.js';
+import { notificarPorRol } from '../../lib/notificaciones.js';
+
+// Bloque 16: cambio de precio. 5% de desviación ARRIBA de lo negociado en la OC dispara la
+// alerta y requiere autorización de Dirección antes de poder aplicarle un pago a la factura.
+const UMBRAL_VARIACION_PRECIO = 0.05;
 
 async function disponibleParaFacturar(client, ocId) {
   const { rows } = await client.query(
@@ -49,11 +55,23 @@ async function cargarFacturaCompleta(client, id) {
   if (!cab[0]) return null;
 
   const { rows: detalle } = await client.query(
-    `SELECT fd.*, i.clave, i.descripcion, i.unidad FROM factura_detalle fd JOIN insumos i ON i.id = fd.insumo_id WHERE fd.factura_id = $1`,
-    [id]
+    `SELECT fd.*, i.clave, i.descripcion, i.unidad, od.precio_negociado,
+            CASE WHEN od.precio_negociado > 0
+                 THEN round(((fd.precio_unitario - od.precio_negociado) / od.precio_negociado) * 100, 2)
+                 ELSE NULL END AS variacion_pct,
+            COALESCE(od.precio_negociado > 0 AND fd.precio_unitario > od.precio_negociado * (1 + $2::numeric), false) AS excede_variacion_precio
+     FROM factura_detalle fd
+     JOIN insumos i ON i.id = fd.insumo_id
+     LEFT JOIN oc_detalle od ON od.oc_id = $3 AND od.insumo_id = fd.insumo_id
+     WHERE fd.factura_id = $1`,
+    [id, UMBRAL_VARIACION_PRECIO, cab[0].oc_id]
   );
 
-  return { ...cab[0], detalle };
+  return {
+    ...cab[0],
+    detalle,
+    hayVariacionSinAutorizar: detalle.some((d) => d.excede_variacion_precio) && !cab[0].variacion_precio_autorizada,
+  };
 }
 
 export default async function facturasRoutes(app) {
@@ -118,7 +136,7 @@ export default async function facturasRoutes(app) {
 
     try {
       const resultado = await withTransaction(async (client) => {
-        const { rows: ocRows } = await client.query('SELECT proveedor_id FROM ordenes_compra WHERE id = $1 FOR UPDATE', [ocId]);
+        const { rows: ocRows } = await client.query('SELECT proveedor_id, folio FROM ordenes_compra WHERE id = $1 FOR UPDATE', [ocId]);
         if (!ocRows[0]) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
 
         const disponible = await disponibleParaFacturar(client, ocId);
@@ -140,6 +158,12 @@ export default async function facturasRoutes(app) {
         let pdfUrl = null;
         if (archivos.xml) xmlUrl = await guardarArchivo(archivos.xml.buffer, archivos.xml.filename, 'facturas');
         if (archivos.pdf) pdfUrl = await guardarArchivo(archivos.pdf.buffer, archivos.pdf.filename, 'facturas');
+
+        const excedeVariacion = detalle.some((item) => {
+          const linea = porInsumo.get(item.insumoId);
+          const negociado = Number(linea?.precio_negociado || 0);
+          return negociado > 0 && Number(item.precioUnitario) > negociado * (1 + UMBRAL_VARIACION_PRECIO);
+        });
 
         const folio = await siguienteFolio(client, 'FAC', 'facturas_folio_seq');
         const total = subtotal + iva;
@@ -165,6 +189,17 @@ export default async function facturasRoutes(app) {
           accion: 'crear', despues: { folio, ocId, total, detalle },
         });
 
+        if (excedeVariacion) {
+          await notificarPorRol(client, {
+            roles: ['direccion'],
+            categoria: 'cambio_precio',
+            entidadTipo: 'factura',
+            entidadId: facturaId,
+            titulo: `Variación de precio en factura ${folio}`,
+            mensaje: `Uno o más insumos facturados están 5% o más arriba de lo negociado en ${ocRows[0].folio}. Requiere tu autorización antes de poder pagarse.`,
+          });
+        }
+
         return cargarFacturaCompleta(client, facturaId);
       });
 
@@ -179,6 +214,38 @@ export default async function facturasRoutes(app) {
       }
       request.log.error(err);
       return reply.code(500).send({ error: 'No se pudo registrar la factura' });
+    }
+  });
+
+  // Bloque 16: Dirección autoriza explícitamente la variación de precio de una factura antes de
+  // que se le pueda aplicar un pago.
+  app.post('/api/facturas/:id/autorizar-variacion', { preHandler: app.requireRole('direccion') }, async (request, reply) => {
+    const { id } = request.params;
+    const { firma } = request.body ?? {};
+    try {
+      const resultado = await withTransaction(async (client) => {
+        const { rows } = await client.query('SELECT id FROM facturas WHERE id = $1 FOR UPDATE', [id]);
+        if (!rows[0]) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
+
+        await registrarFirma(client, { request, entidadTipo: 'factura_variacion_precio', entidadId: id, firma });
+        await client.query(
+          `UPDATE facturas SET variacion_precio_autorizada = true, variacion_precio_autorizada_por = $2, variacion_precio_autorizada_en = now() WHERE id = $1`,
+          [id, request.user.sub]
+        );
+        await registrarBitacora(client, {
+          tabla: 'facturas', registroId: id, usuarioId: request.user.sub, accion: 'autorizar_variacion_precio',
+        });
+        return cargarFacturaCompleta(client, id);
+      });
+      return resultado;
+    } catch (err) {
+      if (err.code === 404) return reply.code(404).send({ error: 'Factura no encontrada' });
+      if (err.message === 'FIRMA_REQUERIDA') return reply.code(400).send({ error: 'Se requiere firma (táctil o PIN) para autorizar' });
+      if (err.message === 'SIN_PIN_CONFIGURADO') return reply.code(400).send({ error: 'Aún no configuras tu PIN de firma. Ve a tu perfil para crearlo.' });
+      if (err.message === 'PIN_INCORRECTO') return reply.code(422).send({ error: 'PIN incorrecto' });
+      if (err.message === 'FIRMA_TACTIL_INVALIDA') return reply.code(400).send({ error: 'La firma táctil capturada no es válida, intenta de nuevo' });
+      request.log.error(err);
+      return reply.code(500).send({ error: 'No se pudo registrar la autorización' });
     }
   });
 

@@ -21,6 +21,16 @@
 
       <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 my-4 no-print">{{ error }}</p>
 
+      <div v-if="oc.estatus === 'borrador' && oc.requiere_autorizacion_monto" class="bg-amber-50 border border-warning/30 text-warning text-sm rounded-lg px-4 py-3 my-4 no-print">
+        <p class="mb-1">
+          Esta OC es de {{ mxn(oc.importe_total) }} — igual o mayor a $20,000, requiere autorización de Dirección,
+          o la excepción de dos firmas (Administrador + Superintendente) para cuando Dirección no pueda firmar.
+        </p>
+        <p v-if="firmantesExcepcion.length" class="text-xs">
+          Firmado por excepción: {{ firmantesExcepcion.join(', ') }} — falta {{ faltanteExcepcionTexto }}.
+        </p>
+      </div>
+
       <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 my-5">
         <ReportePrintHeader
           :titulo="`Orden de Compra ${oc.folio}`"
@@ -55,9 +65,38 @@
         </table>
       </div>
 
-      <button v-if="oc.estatus === 'borrador' && puedeComprar" class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print" :disabled="confirmando" @click="confirmar">
+      <button
+        v-if="oc.estatus === 'borrador' && puedeComprar && !oc.requiere_autorizacion_monto"
+        class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print"
+        :disabled="confirmando"
+        @click="confirmar"
+      >
         {{ confirmando ? 'Confirmando…' : 'Confirmar Orden de Compra' }}
       </button>
+
+      <button
+        v-if="oc.estatus === 'borrador' && oc.requiere_autorizacion_monto && auth.rol === 'direccion'"
+        class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print"
+        @click="firmaAbierta = true"
+      >
+        Autorizar y confirmar
+      </button>
+      <button
+        v-if="oc.estatus === 'borrador' && oc.requiere_autorizacion_monto && ['administrador', 'superintendente'].includes(auth.rol)"
+        class="min-h-[48px] bg-primary text-white font-bold rounded-lg px-5 text-sm no-print disabled:opacity-50"
+        :disabled="yaFirmeExcepcion"
+        @click="firmaAbierta = true"
+      >
+        {{ yaFirmeExcepcion ? 'Ya firmaste esta autorización' : 'Firmar autorización (excepción, 2 firmas)' }}
+      </button>
+
+      <FirmaModal
+        v-if="firmaAbierta"
+        :etiqueta="auth.rol === 'direccion' ? `Autorizar y confirmar ${oc.folio}` : `Firma de excepción (${auth.rol}) para ${oc.folio}`"
+        @firmado="autorizarMonto"
+        @cerrar="firmaAbierta = false"
+        ref="firmaModalRef"
+      />
     </template>
   </AppShell>
 </template>
@@ -68,6 +107,7 @@ import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import BotonVolver from '../components/BotonVolver.vue';
 import ReportePrintHeader from '../components/ReportePrintHeader.vue';
+import FirmaModal from '../components/FirmaModal.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
@@ -77,8 +117,20 @@ const route = useRoute();
 const oc = ref(null);
 const error = ref('');
 const confirmando = ref(false);
+const firmaAbierta = ref(false);
+const firmaModalRef = ref(null);
 
 const total = computed(() => (oc.value?.detalle ?? []).reduce((s, d) => s + d.cantidad_pedida * d.precio_negociado, 0));
+
+const NOMBRES_ROL = { administrador: 'Administrador', superintendente: 'Superintendente', direccion: 'Dirección' };
+const firmantesExcepcion = computed(() => (oc.value?.firmas_excepcion ?? []).map((f) => `${NOMBRES_ROL[f.rol] || f.rol} (${f.nombre})`));
+const faltanteExcepcionTexto = computed(() => {
+  const roles = ['administrador', 'superintendente'];
+  const firmados = new Set((oc.value?.firmas_excepcion ?? []).map((f) => f.rol));
+  const falta = roles.find((r) => !firmados.has(r));
+  return falta ? NOMBRES_ROL[falta] : '';
+});
+const yaFirmeExcepcion = computed(() => (oc.value?.firmas_excepcion ?? []).some((f) => f.rol === auth.rol));
 
 function mxn(n) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
@@ -103,6 +155,16 @@ async function confirmar() {
     error.value = err.response?.data?.error || 'No se pudo confirmar la Orden de Compra.';
   } finally {
     confirmando.value = false;
+  }
+}
+
+async function autorizarMonto(firma) {
+  try {
+    const { data } = await api.post(`/ordenes-compra/${route.params.id}/autorizar-monto`, { firma });
+    oc.value = data;
+    firmaAbierta.value = false;
+  } catch (err) {
+    firmaModalRef.value?.mostrarError(err.response?.data?.error || 'No se pudo registrar la autorización.');
   }
 }
 

@@ -1,6 +1,13 @@
 import { pool, withTransaction } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
+import { registrarFirma } from '../../lib/firma.js';
+import { notificarPorRol } from '../../lib/notificaciones.js';
+
+// Bloque 16: cambio de precio. 5% de desviación ARRIBA del presupuestado dispara la alerta y
+// requiere autorización de Dirección antes de poder cerrar el cuadro comparativo (y así generar
+// la Orden de Compra) — regla confirmada por el usuario.
+const UMBRAL_VARIACION_PRECIO = 0.05;
 
 async function cargarProcesoCompleto(client, id) {
   const { rows: cab } = await client.query(
@@ -53,8 +60,16 @@ async function cargarProcesoCompleto(client, id) {
   );
 
   const { rows: ganadores } = await client.query(
-    `SELECT insumo_id, cotizacion_detalle_id FROM proceso_cotizacion_ganador WHERE proceso_id = $1`,
-    [id]
+    `SELECT g.insumo_id, g.cotizacion_detalle_id, cd.precio_unitario, poi.costo_unitario AS costo_presupuestado,
+            CASE WHEN poi.costo_unitario > 0
+                 THEN round(((cd.precio_unitario - poi.costo_unitario) / poi.costo_unitario) * 100, 2)
+                 ELSE NULL END AS variacion_pct,
+            COALESCE(poi.costo_unitario > 0 AND cd.precio_unitario > poi.costo_unitario * (1 + $2::numeric), false) AS excede_variacion_precio
+     FROM proceso_cotizacion_ganador g
+     JOIN cotizacion_detalle cd ON cd.id = g.cotizacion_detalle_id
+     LEFT JOIN presupuesto_obra_insumo poi ON poi.insumo_id = g.insumo_id AND poi.obra_id = (SELECT obra_id FROM procesos_cotizacion WHERE id = $1)
+     WHERE g.proceso_id = $1`,
+    [id, UMBRAL_VARIACION_PRECIO]
   );
 
   return {
@@ -63,6 +78,7 @@ async function cargarProcesoCompleto(client, id) {
     insumos,
     proveedores: proveedores.map((p) => ({ ...p, detalle: detalle.filter((d) => d.cotizacion_proveedor_id === p.id) })),
     ganadores,
+    hayVariacionSinAutorizar: ganadores.some((g) => g.excede_variacion_precio) && !cab[0].variacion_precio_autorizada,
   };
 }
 
@@ -205,8 +221,13 @@ export default async function cotizacionesRoutes(app) {
     }
 
     const { rows: valido } = await pool.query(
-      `SELECT cd.id FROM cotizacion_detalle cd
+      `SELECT cd.id, cd.precio_unitario, i.clave, i.descripcion,
+              pc.obra_id, pc.folio, poi.costo_unitario AS costo_presupuestado
+       FROM cotizacion_detalle cd
        JOIN cotizaciones_proveedor cp ON cp.id = cd.cotizacion_proveedor_id
+       JOIN procesos_cotizacion pc ON pc.id = cp.proceso_id
+       JOIN insumos i ON i.id = cd.insumo_id
+       LEFT JOIN presupuesto_obra_insumo poi ON poi.insumo_id = cd.insumo_id AND poi.obra_id = pc.obra_id
        WHERE cd.id = $1 AND cp.proceso_id = $2 AND cd.insumo_id = $3`,
       [cotizacionDetalleId, id, insumoId]
     );
@@ -219,13 +240,61 @@ export default async function cotizacionesRoutes(app) {
       [id, insumoId, cotizacionDetalleId]
     );
 
+    const g = valido[0];
+    const costo = Number(g.costo_presupuestado || 0);
+    if (costo > 0 && Number(g.precio_unitario) > costo * (1 + UMBRAL_VARIACION_PRECIO)) {
+      const pct = (((Number(g.precio_unitario) - costo) / costo) * 100).toFixed(1);
+      await notificarPorRol(pool, {
+        roles: ['direccion'],
+        categoria: 'cambio_precio',
+        entidadTipo: 'cotizacion',
+        entidadId: id,
+        titulo: `Variación de precio en ${g.folio}`,
+        mensaje: `${g.clave} · ${g.descripcion} cotizado ${pct}% arriba del presupuesto. Requiere tu autorización antes de cerrar.`,
+      });
+    }
+
     return cargarProcesoCompleto(pool, id);
+  });
+
+  // Bloque 16: Dirección autoriza explícitamente la variación de precio antes de poder cerrar
+  // el cuadro comparativo cuando algún ganador excede el 5% sobre el presupuesto.
+  app.post('/api/cotizaciones/:id/autorizar-variacion', { preHandler: app.requireRole('direccion') }, async (request, reply) => {
+    const { id } = request.params;
+    const { firma } = request.body ?? {};
+    try {
+      const resultado = await withTransaction(async (client) => {
+        const { rows } = await client.query('SELECT estatus FROM procesos_cotizacion WHERE id = $1 FOR UPDATE', [id]);
+        if (!rows[0]) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
+        if (rows[0].estatus !== 'en_cotizacion') throw Object.assign(new Error('CERRADO'), { code: 409 });
+
+        await registrarFirma(client, { request, entidadTipo: 'cotizacion_variacion_precio', entidadId: id, firma });
+        await client.query(
+          `UPDATE procesos_cotizacion SET variacion_precio_autorizada = true, variacion_precio_autorizada_por = $2, variacion_precio_autorizada_en = now() WHERE id = $1`,
+          [id, request.user.sub]
+        );
+        await registrarBitacora(client, {
+          tabla: 'procesos_cotizacion', registroId: id, usuarioId: request.user.sub, accion: 'autorizar_variacion_precio',
+        });
+        return cargarProcesoCompleto(client, id);
+      });
+      return resultado;
+    } catch (err) {
+      if (err.code === 404) return reply.code(404).send({ error: 'Proceso de cotización no encontrado' });
+      if (err.code === 409) return reply.code(409).send({ error: 'Este proceso ya está cerrado' });
+      if (err.message === 'FIRMA_REQUERIDA') return reply.code(400).send({ error: 'Se requiere firma (táctil o PIN) para autorizar' });
+      if (err.message === 'SIN_PIN_CONFIGURADO') return reply.code(400).send({ error: 'Aún no configuras tu PIN de firma. Ve a tu perfil para crearlo.' });
+      if (err.message === 'PIN_INCORRECTO') return reply.code(422).send({ error: 'PIN incorrecto' });
+      if (err.message === 'FIRMA_TACTIL_INVALIDA') return reply.code(400).send({ error: 'La firma táctil capturada no es válida, intenta de nuevo' });
+      request.log.error(err);
+      return reply.code(500).send({ error: 'No se pudo registrar la autorización' });
+    }
   });
 
   app.post('/api/cotizaciones/:id/cerrar', { preHandler: app.requireRole('comprador', 'direccion') }, async (request, reply) => {
     const { id } = request.params;
     const resultado = await withTransaction(async (client) => {
-      const { rows: procRows } = await client.query('SELECT estatus FROM procesos_cotizacion WHERE id = $1 FOR UPDATE', [id]);
+      const { rows: procRows } = await client.query('SELECT estatus, variacion_precio_autorizada FROM procesos_cotizacion WHERE id = $1 FOR UPDATE', [id]);
       if (!procRows[0]) return { error: 404 };
       if (procRows[0].estatus !== 'en_cotizacion') return { error: 409, mensaje: 'Este proceso ya está cerrado' };
 
@@ -241,6 +310,18 @@ export default async function cotizacionesRoutes(app) {
       const faltantes = insumos.filter((i) => !insumosConGanador.has(i.insumo_id));
       if (faltantes.length > 0) {
         return { error: 422, mensaje: 'Falta elegir proveedor ganador para todos los insumos antes de cerrar' };
+      }
+
+      const { rows: variacionRows } = await client.query(
+        `SELECT COALESCE(bool_or(poi.costo_unitario > 0 AND cd.precio_unitario > poi.costo_unitario * (1 + $2::numeric)), false) AS excede
+         FROM proceso_cotizacion_ganador g
+         JOIN cotizacion_detalle cd ON cd.id = g.cotizacion_detalle_id
+         LEFT JOIN presupuesto_obra_insumo poi ON poi.insumo_id = g.insumo_id AND poi.obra_id = (SELECT obra_id FROM procesos_cotizacion WHERE id = $1)
+         WHERE g.proceso_id = $1`,
+        [id, UMBRAL_VARIACION_PRECIO]
+      );
+      if (variacionRows[0].excede && !procRows[0].variacion_precio_autorizada) {
+        return { error: 422, mensaje: 'Hay insumos con precio 5% o más arriba del presupuesto, pendientes de autorización de Dirección' };
       }
 
       await client.query("UPDATE procesos_cotizacion SET estatus = 'cerrado', cerrado_en = now() WHERE id = $1", [id]);
