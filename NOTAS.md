@@ -614,3 +614,16 @@ cambio de estructura de base de datos.
     la campanita rápida del header, que se había quedado sin registrar.
   - Probado en el navegador: los 4 grupos muestran exactamente los ítems esperados, avatar y
     campanita del mismo tamaño (54×54px) confirmado por medición directa del DOM.
+- **Ajustes finos de estilo** (07/08/2026): segunda ronda tras probar el sistema.
+  - "STRUKTIVA" en el header más grande (26px → 34px), "Sistema ERP" más chico (17px → 13px).
+  - Botones de los menús agrupados ~25% más bajos de alto (padding vertical 8px → 6px), sin
+    tocar el tamaño del texto.
+  - Botones "Imprimir / Guardar PDF" (13 vistas) y "Por obra"/"Vista general" (Dashboard)
+    ajustados a la altura real medida del selector de obra (39px) — antes eran 40px/42px/38px,
+    ligeras inconsistencias entre sí.
+  - Título de la sección visible (el `<h2>` de cada pantalla) al doble de tamaño: se identificaron
+    y ajustaron los dos patrones usados en todo el proyecto — `font-display text-lg` (18px→36px,
+    44 archivos) y `text-[16px] font-display` (16px→32px, Dashboard y Requisiciones) —
+    reemplazo verificado uno-a-uno por archivo antes de aplicar (una sola ocurrencia por archivo).
+  - Verificado en el navegador con medición directa del DOM: botones y selector a 39px exactos,
+    título de sección a 36px, sin romper ningún layout.

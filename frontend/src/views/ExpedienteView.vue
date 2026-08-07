@@ -4,7 +4,7 @@
     <template v-else>
       <BotonVolver fallback="/requisiciones" />
       <div class="mb-1">
-        <h2 class="font-display text-lg">Expediente — {{ datos.requisicion.partida_nombre }}</h2>
+        <h2 class="font-display text-[36px]">Expediente — {{ datos.requisicion.partida_nombre }}</h2>
         <p class="text-xs text-slate-500">
           Un solo folio raíz ({{ datos.requisicion.folio }}) conecta cada eslabón. Nada de esto se consultó en otro módulo aparte.
         </p>

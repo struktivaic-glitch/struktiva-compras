@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Nueva salida de almacén</h2>
+    <h2 class="font-display text-[36px] mb-1">Nueva salida de almacén</h2>
     <p class="text-xs text-slate-500 mb-4">Entrega de material del almacén de obra hacia un frente/cuadrilla.</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-3 gap-3 max-w-2xl">

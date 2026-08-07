@@ -3,7 +3,7 @@
     <div v-if="!pago" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
       <BotonVolver fallback="/pagos" />
-      <h2 class="font-display text-lg mb-1">{{ pago.folio }}</h2>
+      <h2 class="font-display text-[36px] mb-1">{{ pago.folio }}</h2>
       <p class="text-xs text-slate-500 mb-5">
         {{ pago.proveedor_nombre }} · {{ pago.forma_pago }} · {{ pago.referencia || 'sin referencia' }} ·
         Registró: {{ pago.registro_nombre }} · {{ new Date(pago.fecha).toLocaleDateString('es-MX') }}

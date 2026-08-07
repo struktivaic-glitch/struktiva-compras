@@ -5,7 +5,7 @@
       <BotonVolver fallback="/requisiciones" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
-          <h2 class="font-display text-lg">
+          <h2 class="font-display text-[36px]">
             {{ req.folio }}
             <span v-if="hayExcedente" class="ml-1.5 text-[11px] font-bold text-danger align-middle">● excede presupuesto</span>
           </h2>
@@ -20,7 +20,7 @@
           <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="estatusClase(req.estatus)">
             {{ estatusTexto(req.estatus) }}
           </span>
-          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+          <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
         </div>
       </div>
 

@@ -5,7 +5,7 @@
       <BotonVolver fallback="/facturas" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
         <div>
-          <h2 class="font-display text-lg">{{ factura.folio }}</h2>
+          <h2 class="font-display text-[36px]">{{ factura.folio }}</h2>
           <p class="text-xs text-slate-500">
             {{ factura.proveedor_nombre }} · Contra {{ factura.oc_folio }} ·
             Serie/folio fiscal: {{ factura.serie_folio || '—' }} · UUID: {{ factura.folio_fiscal_uuid || '—' }}

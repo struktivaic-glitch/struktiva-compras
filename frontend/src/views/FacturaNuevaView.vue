@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Nueva factura</h2>
+    <h2 class="font-display text-[36px] mb-1">Nueva factura</h2>
     <p class="text-xs text-slate-500 mb-4">Coincidencia triple: la factura solo puede vincular lo que ya fue físicamente recibido en almacén contra esta Orden de Compra.</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-4 gap-3">

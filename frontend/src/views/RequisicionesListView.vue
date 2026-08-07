@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-      <h2 class="text-[16px] font-display">Requisiciones</h2>
+      <h2 class="text-[32px] font-display">Requisiciones</h2>
       <div class="flex items-center gap-2">
         <select v-model="filtroEstatus" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2" @change="cargar">
           <option value="">Todos los estatus</option>

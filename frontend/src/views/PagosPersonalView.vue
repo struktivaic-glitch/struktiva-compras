@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3 no-print">
       <div>
-        <h2 class="font-display text-lg">Pagos a Personal</h2>
+        <h2 class="font-display text-[36px]">Pagos a Personal</h2>
         <p class="text-xs text-slate-500">Control interno de gasto de personal — no calcula ISR/IMSS ni sustituye un recibo fiscal.</p>
       </div>
       <div class="flex items-center gap-2">
@@ -11,7 +11,7 @@
           <option value="pendiente">Pendiente</option>
           <option value="pagado">Pagado</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+        <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 

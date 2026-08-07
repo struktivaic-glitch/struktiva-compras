@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Mi perfil</h2>
+    <h2 class="font-display text-[36px] mb-1">Mi perfil</h2>
     <p class="text-xs text-slate-500 mb-5">{{ auth.usuario?.nombre }} · {{ auth.usuario?.rolNombre }} · {{ auth.usuario?.email }}</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-5 max-w-sm">

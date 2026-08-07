@@ -3,7 +3,7 @@
     <div v-if="!salida" class="text-sm text-slate-500">Cargando…</div>
     <template v-else>
       <BotonVolver fallback="/almacen/salidas" />
-      <h2 class="font-display text-lg mb-1">{{ salida.folio }}</h2>
+      <h2 class="font-display text-[36px] mb-1">{{ salida.folio }}</h2>
       <p class="text-xs text-slate-500 mb-5">
         {{ salida.obra_nombre }} / {{ salida.frente_nombre }} · Entregó: {{ salida.entrego_nombre }} · Recibió: {{ salida.usuario_recibe_nombre }} ·
         {{ new Date(salida.fecha).toLocaleDateString('es-MX') }}

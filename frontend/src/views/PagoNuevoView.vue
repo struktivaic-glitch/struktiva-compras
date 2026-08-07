@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Nuevo pago a proveedor</h2>
+    <h2 class="font-display text-[36px] mb-1">Nuevo pago a proveedor</h2>
     <p class="text-xs text-slate-500 mb-4">Aplica el pago a una o varias facturas con saldo pendiente (permite abonos parciales).</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-4 gap-3">

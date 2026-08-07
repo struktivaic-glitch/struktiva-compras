@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
       <div>
-        <h2 class="font-display text-lg">Maquinaria y Equipos</h2>
+        <h2 class="font-display text-[36px]">Maquinaria y Equipos</h2>
         <p class="text-xs text-slate-500">
           Catálogo, expediente (documentos) y bitácora de mantenimiento. Para equipo rentado solo se controlan
           fechas de vigencia y documentación — el costo de la renta se registra como cualquier otro gasto en Requisiciones/Facturas.

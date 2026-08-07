@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-display text-lg">Salidas de almacén</h2>
+      <h2 class="font-display text-[36px]">Salidas de almacén</h2>
       <RouterLink to="/almacen/salidas/nueva" class="min-h-[40px] flex items-center bg-primary text-white text-sm font-bold rounded-lg px-4">
         + Nueva salida
       </RouterLink>

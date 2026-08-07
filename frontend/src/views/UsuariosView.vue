@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-display text-lg">Usuarios</h2>
+      <h2 class="font-display text-[36px]">Usuarios</h2>
     </div>
 
     <form v-if="puedeEditar" class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-5 gap-3 items-end" @submit.prevent="crear">

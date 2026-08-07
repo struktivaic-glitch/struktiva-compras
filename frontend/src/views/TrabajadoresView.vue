@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
       <div>
-        <h2 class="font-display text-lg">Personal</h2>
+        <h2 class="font-display text-[36px]">Personal</h2>
         <p class="text-xs text-slate-500">
           Catálogo de personal — de campo (jornaleros) y administrativo. Se usa para el desglose de Mano de
           Obra en las requisiciones y para el expediente de cada persona. No es nómina ni un registro fiscal.

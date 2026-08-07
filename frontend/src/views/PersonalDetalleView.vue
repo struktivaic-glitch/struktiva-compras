@@ -5,7 +5,7 @@
       <BotonVolver fallback="/trabajadores" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
         <div>
-          <h2 class="font-display text-lg">{{ persona.nombre }}</h2>
+          <h2 class="font-display text-[36px]">{{ persona.nombre }}</h2>
           <p class="text-xs text-slate-500 capitalize">
             {{ persona.tipo }} · {{ persona.puesto || persona.oficio || 'Sin puesto/oficio capturado' }}
             <span v-if="!persona.activo" class="ml-1.5 text-[11px] font-bold text-danger">· Inactivo</span>

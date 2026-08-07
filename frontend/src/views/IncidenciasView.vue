@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3 no-print">
       <div>
-        <h2 class="font-display text-lg">Incidencias</h2>
+        <h2 class="font-display text-[36px]">Incidencias</h2>
         <p class="text-xs text-slate-500">Faltas, permisos, vacaciones e incapacidades del personal — control interno, no es un trámite fiscal.</p>
       </div>
       <div class="flex items-center gap-2">
@@ -12,7 +12,7 @@
           <option value="autorizada">Autorizada</option>
           <option value="rechazada">Rechazada</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+        <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 

@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-display text-lg">Proveedores</h2>
+      <h2 class="font-display text-[36px]">Proveedores</h2>
       <label v-if="puedeEditar" class="flex items-center gap-1.5 text-xs text-slate-500">
         <input type="checkbox" v-model="incluirInactivos" @change="cargar" class="w-4 h-4" /> Mostrar inactivos
       </label>

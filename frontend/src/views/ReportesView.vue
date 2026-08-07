@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Reportes</h2>
+    <h2 class="font-display text-[36px] mb-1">Reportes</h2>
     <p class="text-xs text-slate-500 mb-5">Filtros por Obra, Fecha, Familia, Proveedor y Estatus dentro de cada reporte. Cada uno se puede imprimir o guardar como PDF desde el navegador.</p>
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">

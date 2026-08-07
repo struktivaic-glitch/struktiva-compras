@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div>
-        <h2 class="font-display text-lg">Nueva requisición</h2>
+        <h2 class="font-display text-[36px]">Nueva requisición</h2>
         <p class="text-xs text-slate-500">
           {{ tipoRequisicion === 'nomina'
             ? 'Cada renglón es un rubro de Mano de Obra; se desglosa en las personas que cobran contra él (días × tarifa).'

@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Nueva entrada de almacén</h2>
+    <h2 class="font-display text-[36px] mb-1">Nueva entrada de almacén</h2>
     <p class="text-xs text-slate-500 mb-4">Registra el material físico contra la Remisión del Proveedor, amarrado a una Orden de Compra confirmada.</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-2 gap-3 max-w-lg">

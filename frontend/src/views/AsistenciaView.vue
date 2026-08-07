@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3 no-print">
       <div>
-        <h2 class="font-display text-lg">Asistencia</h2>
+        <h2 class="font-display text-[36px]">Asistencia</h2>
         <p class="text-xs text-slate-500">
           Registro de jornada (entrada/salida/comida) — apoya el registro electrónico que exige la LFT
           (Art. 132 Fracc. XXXIV). Las marcas originales son inalterables; las correcciones quedan documentadas.
@@ -135,7 +135,7 @@
             <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
           </select>
         </div>
-        <button class="min-h-[42px] bg-primary text-white text-sm font-bold rounded-lg px-4 ml-auto" @click="imprimir">Imprimir / Guardar PDF</button>
+        <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4 ml-auto" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
 
       <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5">
@@ -198,7 +198,7 @@
           <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Hasta</label>
           <input v-model="hasta" type="date" class="border border-slate-300 rounded-lg px-2.5 min-h-[42px]" @change="cargarHorasExtra" />
         </div>
-        <button class="min-h-[42px] bg-primary text-white text-sm font-bold rounded-lg px-4 ml-auto no-print" @click="imprimir">Imprimir / Guardar PDF</button>
+        <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4 ml-auto no-print" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
 
       <div class="print-sheet bg-white border border-slate-200 rounded-xl p-5 mb-5">

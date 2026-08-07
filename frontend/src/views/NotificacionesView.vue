@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-4">Notificaciones</h2>
+    <h2 class="font-display text-[36px] mb-4">Notificaciones</h2>
 
     <div class="flex gap-1 overflow-x-auto mb-5 bg-white border border-slate-200 rounded-xl p-1">
       <button

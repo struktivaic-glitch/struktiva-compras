@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Nuevo cuadro comparativo</h2>
+    <h2 class="font-display text-[36px] mb-1">Nuevo cuadro comparativo</h2>
     <p class="text-xs text-slate-500 mb-4">Selecciona la obra y las requisiciones autorizadas que quieres cotizar juntas.</p>
 
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5 max-w-xs">

@@ -5,7 +5,7 @@
       <BotonVolver fallback="/cotizaciones" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
-          <h2 class="font-display text-lg">{{ proceso.folio }}</h2>
+          <h2 class="font-display text-[36px]">{{ proceso.folio }}</h2>
           <p class="text-xs text-slate-500">
             {{ proceso.obra_nombre }} · Requisiciones: {{ proceso.requisiciones.map(r => r.folio).join(', ') }}
           </p>
@@ -14,7 +14,7 @@
           <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="proceso.estatus === 'cerrado' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
             {{ proceso.estatus === 'cerrado' ? 'Cerrado' : 'En cotización' }}
           </span>
-          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+          <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
         </div>
       </div>
 

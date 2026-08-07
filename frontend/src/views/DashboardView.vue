@@ -1,18 +1,18 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-      <h2 class="text-[16px] font-display">Dashboard</h2>
+      <h2 class="text-[32px] font-display">Dashboard</h2>
       <div class="flex items-center gap-2">
         <div class="flex items-center gap-1 text-sm">
           <button
-            class="min-h-[38px] px-3 rounded-lg font-semibold"
+            class="min-h-[39px] px-3 rounded-lg font-semibold"
             :class="vista === 'obra' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
             @click="vista = 'obra'"
           >
             Por obra
           </button>
           <button
-            class="min-h-[38px] px-3 rounded-lg font-semibold"
+            class="min-h-[39px] px-3 rounded-lg font-semibold"
             :class="vista === 'general' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
             @click="vista = 'general'; cargarResumen()"
           >
@@ -101,7 +101,7 @@
       </div>
 
       <div class="flex items-baseline justify-between mb-2.5">
-        <h2 class="text-[16px] font-display">Saldos por familia de insumo</h2>
+        <h2 class="text-[32px] font-display">Saldos por familia de insumo</h2>
         <span class="text-[11px] uppercase tracking-wide text-slate-500">{{ obraNombre }}</span>
       </div>
 

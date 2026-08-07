@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-1">Importar Presupuesto General</h2>
+    <h2 class="font-display text-[36px] mb-1">Importar Presupuesto General</h2>
     <p class="text-xs text-slate-500 mb-5">
       Sube el Excel del presupuesto contratado (catálogo de conceptos: Capítulo, Clave, Concepto, Unidad, Cantidad, P.U.).
       Este es el presupuesto general por partidas/conceptos — distinto de la Explosión de Insumos, que controla el gasto por material.

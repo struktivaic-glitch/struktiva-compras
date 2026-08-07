@@ -5,7 +5,7 @@
       <BotonVolver fallback="/equipos" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
         <div>
-          <h2 class="font-display text-lg">{{ equipo.clave }} · {{ equipo.descripcion }}</h2>
+          <h2 class="font-display text-[36px]">{{ equipo.clave }} · {{ equipo.descripcion }}</h2>
           <p class="text-xs text-slate-500">{{ equipo.marca }} {{ equipo.modelo }} · {{ equipo.obra_nombre || 'Sin obra asignada' }}</p>
         </div>
         <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="estatusClase(equipo.estatus)">{{ estatusTexto(equipo.estatus) }}</span>

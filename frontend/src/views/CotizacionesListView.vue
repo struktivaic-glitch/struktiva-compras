@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-display text-lg">Cotizaciones</h2>
+      <h2 class="font-display text-[36px]">Cotizaciones</h2>
       <RouterLink to="/cotizaciones/nueva" class="min-h-[40px] flex items-center bg-primary text-white text-sm font-bold rounded-lg px-4">
         + Nuevo cuadro comparativo
       </RouterLink>

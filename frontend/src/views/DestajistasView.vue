@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
       <div>
-        <h2 class="font-display text-lg">Destajistas</h2>
+        <h2 class="font-display text-[36px]">Destajistas</h2>
         <p class="text-xs text-slate-500">
           Catálogo de contratistas a destajo — separado del catálogo de Personal (jornaleros/administrativo).
           Se usa para armar Destajos ligados a un concepto del presupuesto general.

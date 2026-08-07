@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-1 flex-wrap gap-3">
-      <h2 class="font-display text-lg">Avance de Obra</h2>
+      <h2 class="font-display text-[36px]">Avance de Obra</h2>
       <select v-model.number="obraId" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2">
         <option v-for="o in obras" :key="o.id" :value="o.id">{{ o.nombre }}</option>
       </select>

@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <h2 class="font-display text-lg mb-4">Órdenes de compra</h2>
+    <h2 class="font-display text-[36px] mb-4">Órdenes de compra</h2>
 
     <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl">
       <table class="w-full text-sm tabular-nums">

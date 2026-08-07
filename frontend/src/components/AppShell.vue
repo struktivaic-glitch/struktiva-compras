@@ -4,8 +4,8 @@
       <div class="max-w-6xl mx-auto px-[30px] py-[18px] flex items-center gap-[24px] flex-wrap">
         <BrandMark :size="51" />
         <div class="mr-auto leading-tight">
-          <b class="font-display text-[26px] tracking-wide">STRUKTIVA</b>
-          <div class="text-[17px] text-sky-100/80">Sistema ERP</div>
+          <b class="font-display text-[34px] tracking-wide">STRUKTIVA</b>
+          <div class="text-[13px] text-sky-100/80">Sistema ERP</div>
         </div>
         <NotificacionesBell />
         <RouterLink to="/perfil" title="Mi perfil">
@@ -30,7 +30,7 @@
         <button
           v-for="g in gruposVisibles"
           :key="g.clave"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[14px] font-bold"
+          class="flex items-center gap-1.5 px-3 py-[6px] rounded-lg text-[14px] font-bold"
           :class="grupoAbierto === g.clave || grupoActivo === g.clave ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'"
           @click="grupoAbierto = grupoAbierto === g.clave ? null : g.clave"
         >

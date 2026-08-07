@@ -5,7 +5,7 @@
       <BotonVolver fallback="/ordenes-compra" />
       <div class="flex items-center justify-between flex-wrap gap-3 mb-1 no-print">
         <div>
-          <h2 class="font-display text-lg">{{ oc.folio }}</h2>
+          <h2 class="font-display text-[36px]">{{ oc.folio }}</h2>
           <p class="text-xs text-slate-500">
             {{ oc.proveedor_nombre }} ({{ oc.proveedor_rfc || 'sin RFC' }}) · Cotización {{ oc.cotizacion_folio }} ·
             Requisiciones: {{ oc.requisiciones.map(r => r.folio).join(', ') }}
@@ -15,7 +15,7 @@
           <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="oc.estatus === 'confirmada' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
             {{ oc.estatus === 'confirmada' ? 'Confirmada' : 'Borrador' }}
           </span>
-          <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+          <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
         </div>
       </div>
 

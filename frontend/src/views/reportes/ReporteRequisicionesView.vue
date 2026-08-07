@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="flex items-center justify-between mb-4 no-print flex-wrap gap-3">
-      <h2 class="font-display text-lg">Listado de Requisiciones</h2>
+      <h2 class="font-display text-[36px]">Listado de Requisiciones</h2>
       <div class="flex items-center gap-2">
         <select v-model="estatus" class="text-sm border border-slate-300 rounded-lg px-2.5 py-2" @change="cargar">
           <option value="">Todos los estatus</option>
@@ -12,7 +12,7 @@
           <option value="atendida_total">Atendida total</option>
           <option value="cancelada">Cancelada</option>
         </select>
-        <button class="min-h-[40px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
+        <button class="min-h-[39px] bg-primary text-white text-sm font-bold rounded-lg px-4" @click="imprimir">Imprimir / Guardar PDF</button>
       </div>
     </div>
 
