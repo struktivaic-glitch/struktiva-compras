@@ -653,8 +653,22 @@ cambio de estructura de base de datos.
   - Verificado en el navegador: campos de formulario (selects e input de texto) en `/requisiciones/
     nueva` a 30px/13px, enlace "+ Nueva requisición" y selector de estatus en `/requisiciones` a
     30px/13px, campanita y avatar con el boxShadow blanco confirmado por lectura directa del DOM.
-  - Pendiente de ese mismo mensaje del usuario: cambiar el fondo de "la sección" a "azul de halo"
-    con contraste en botones/texto encima — no se implementó todavía porque es ambiguo en dos
-    ejes (qué sección exactamente, y qué tono de azul es "halo") y no hay ninguna definición previa
-    de ese término en el proyecto; se le preguntará directamente antes de tocar nada, dado que un
-    cambio de fondo global mal calibrado afectaría legibilidad en todo el sistema.
+  - Quinta vuelta (mismo día): el "azul de halo" pendiente se resolvió preguntando al usuario los
+    dos ejes ambiguos — respondió **"todo el fondo general"** y **"azul medio vibrante"**. Se
+    definió el color `halo` (`#2563EB`) en `tailwind.config.js` y se cambió el fondo raíz de
+    `AppShell` (`bg-slate-100` → `bg-halo`); el header y la barra de menús agrupados conservan su
+    propio fondo (`bg-primary`/blanco) y no se tocaron.
+  - Contraste resuelto con herencia de `color` en CSS en vez de tocar archivo por archivo: `main {
+    color:#fff }` por defecto, restaurado a oscuro (`#0f172a`) dentro de cualquier tarjeta clara
+    (`bg-white`, `bg-slate-50`, `bg-slate-100/200`, `bg-red/emerald/amber/sky-50`) y tablas —
+    aprovecha que la mayoría de los títulos de sección (`<h2>`) no tenían color explícito, así
+    que se iluminan solos. Para el texto secundario y bordes que sí tenían clase explícita
+    (`text-slate-400/500/600`, `border-slate-300`) y quedan sueltos fuera de cualquier tarjeta
+    clara (párrafos bajo el título, botones tipo "outline" como los tabs de Asistencia o "Por
+    obra/Vista general" del Dashboard), se agregó una regla con selectores `:not(.bg-white *)`
+    (y equivalentes) que los aclara solo cuando NO están dentro de una tarjeta — lo mismo dentro
+    de una tarjeta clara queda intacto.
+  - Pendiente de verificación visual en producción tras el deploy de este cambio (fondo azul,
+    títulos legibles, tarjetas sin alterar) — se hará contra el sitio en vivo, no en local, para
+    no arriesgar usar una credencial de base de datos ambigua fuera de la ya establecida para
+    este proyecto.
