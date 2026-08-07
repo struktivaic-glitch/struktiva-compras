@@ -31,6 +31,26 @@
     <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 mb-4">{{ error }}</p>
     <p v-if="mensaje" class="bg-emerald-50 border border-success/30 text-success text-sm rounded-lg px-4 py-3 mb-4">{{ mensaje }}</p>
 
+    <div class="flex items-center gap-1 text-sm mb-3">
+      <button
+        class="min-h-[30px] px-3 rounded-lg font-semibold"
+        :class="vista === 'activos' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
+        @click="vista = 'activos'"
+      >
+        Activos ({{ usuarios.filter((u) => u.activo).length }})
+      </button>
+      <button
+        class="min-h-[30px] px-3 rounded-lg font-semibold"
+        :class="vista === 'inactivos' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-600'"
+        @click="vista = 'inactivos'"
+      >
+        Inactivos ({{ usuarios.filter((u) => !u.activo).length }})
+      </button>
+    </div>
+    <p v-if="vista === 'inactivos'" class="text-xs text-slate-500 mb-3">
+      Solo consulta — cuentas que ya no pueden iniciar sesión. Para reactivar una, usa "Editar" y marca "Activo" de nuevo.
+    </p>
+
     <div class="overflow-x-auto bg-white border border-slate-200 rounded-xl">
       <table class="w-full text-sm">
         <thead>
@@ -44,7 +64,12 @@
           </tr>
         </thead>
         <tbody>
-          <template v-for="u in usuarios" :key="u.id">
+          <tr v-if="!usuariosVista.length">
+            <td :colspan="puedeEditar ? 6 : 5" class="px-4 py-8 text-center text-slate-400 text-sm">
+              {{ vista === 'activos' ? 'No hay usuarios activos.' : 'No hay usuarios inactivos.' }}
+            </td>
+          </tr>
+          <template v-for="u in usuariosVista" :key="u.id">
             <tr v-if="editando !== u.id" class="border-t border-slate-200">
               <td class="px-4 py-2.5">
                 <AvatarUsuario :usuario-id="u.id" :nombre="u.nombre" :tiene-foto="u.tiene_foto" size-class="w-8 h-8" text-size-class="text-xs" />
@@ -125,7 +150,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import AvatarUsuario from '../components/AvatarUsuario.vue';
 import { api } from '../lib/api.js';
@@ -137,6 +162,10 @@ const puedeEditar = auth.rol === 'direccion';
 
 const usuarios = ref([]);
 const roles = ref([]);
+// Los inactivos se separan a su propia pestaña, solo para consulta — no hacen volumen en la
+// lista de activos, que es la que se usa en el día a día (pedido del usuario 07/08/2026).
+const vista = ref('activos');
+const usuariosVista = computed(() => usuarios.value.filter((u) => (vista.value === 'activos' ? u.activo : !u.activo)));
 const nuevo = reactive({ nombre: '', email: '', rolId: null, password: '' });
 const guardando = ref(false);
 const error = ref('');

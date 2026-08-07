@@ -915,3 +915,16 @@ cambio de estructura de base de datos.
     el equipo ya empezó a usar cuentas reales en el sistema en vivo. Bien — solo lo anoto porque
     cambia cuáles credenciales demo siguen sirviendo para pruebas futuras en este documento (ver
     sección "Usuarios demo" al inicio, que puede estar quedándose desactualizada).
+  - **Pestañas Activos/Inactivos** (mismo día, ronda separada): el usuario preguntó si al no
+    poder eliminar a alguien con actividad se podía al menos "eliminar el usuario como tal y solo
+    dejar los registros" — se le explicó la diferencia real entre anonimizar (perder el nombre en
+    cada registro) y congelar el nombre como texto en cada una de las ~15 tablas que referencian
+    usuarios (cambio grande), y que "Desactivar" ya cubre el caso real ("quitarle acceso, conservar
+    todo intacto") sin tocar nada de código — el usuario confirmó que eso es justo lo que
+    necesitaba. Pidió, de paso, que los inactivos no "hagan volumen" en la lista de activos.
+    Se agregaron dos pestañas tipo tab (mismo patrón visual que Dashboard/Asistencia) — "Activos"
+    (default) e "Inactivos" (con nota de "solo consulta" y recordatorio de cómo reactivar) — cada
+    una con su contador. Sin cambios de backend, es filtrado en el frontend sobre los mismos datos
+    que ya llegaban de `/usuarios`. Probado contra Neon con un usuario Dirección de prueba
+    (creado/eliminado por SQL directo, sin tocar cuentas reales): "Activos (8)" excluye
+    correctamente a la cuenta demo inactiva, "Inactivos (1)" la muestra sola con el aviso.
