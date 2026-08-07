@@ -717,3 +717,9 @@ cambio de estructura de base de datos.
     texto oscuro. Verificado en producción: selector de obra del Dashboard pasó de
     `bg:#fff / color:#fff` (invisible) a `bg:#fff / color:#0f172a` (legible), sin afectar los
     campos que ya vivían dentro de tarjetas blancas (mismo resultado que antes).
+  - Barrido de verificación en producción tras el deploy (5 puntos distintos, `getComputedStyle`
+    directo): selector de obra suelto en Dashboard, dos `<select>` de filtro sueltos en Equipos
+    (incl. `filtroEstatus`), input de fecha suelto en Asistencia, `<textarea>` del modal "Nuevo
+    destajo" en Destajos, y un `<select>` dentro de una tarjeta blanca en Requisición Nueva (para
+    confirmar que no hay regresión) — los 5 dieron `bg:#fff / color:#0f172a`, ninguno quedó
+    invisible. No se encontró ningún caso adicional pendiente en este barrido.
