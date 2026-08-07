@@ -541,3 +541,29 @@ cambio de estructura de base de datos.
     puede, éxito para Superintendente, ahora sí cuenta en el acumulado), importación real de un
     .xlsx con capítulos/conceptos, y el reporte de avance financiero — datos de prueba eliminados
     después.
+- **Bloque 30** (07/08/2026): Destajos — segundo módulo de la lista de 4, apoyado en el Bloque 29.
+  Catálogo de **destajistas separado** del catálogo de Personal/trabajadores (decisión explícita
+  del usuario: no mezclar contratistas a destajo con jornaleros/administrativo). Un Destajo liga
+  un destajista a UN concepto del presupuesto general con su propio precio pactado — normalmente
+  distinto del P.U. general del concepto, porque el destajo cubre solo mano de obra + materiales
+  inherentes a la actividad (ejemplo real del usuario: castillo colocado y colado a $50/ml,
+  incluye cimbra; el concreto/varilla/alambre los suministra la empresa aparte). Confirmado con
+  el usuario: **es el mismo concepto y el mismo volumen** del Bloque 29 — el monto que se le debe
+  al destajista se calcula solo del avance físico ya CONFIRMADO de ese concepto, sin volver a
+  capturarlo ni medirlo por separado.
+  - Migración 023: `destajistas`, `destajos` (con `precio_destajo`, un solo destajo `activo` por
+    concepto a la vez — índice único parcial), `destajo_pago` (anticipos).
+  - Backend: catálogo de destajistas (alta/edición), `GET /api/destajos/conceptos-disponibles`
+    (conceptos de la obra sin destajo activo, para elegir al armar uno nuevo), crear/cerrar
+    destajo (liquidado/cancelado), registrar pagos con candado de saldo (no se puede pagar más
+    del monto ganado pendiente) y candado de estatus (no se puede pagar un destajo ya
+    cancelado/liquidado).
+  - Frontend: `Destajistas` (catálogo simple) y `Destajos` (tabla con avance/ganado/pagado/saldo
+    en vivo, modal para crear un destajo nuevo, modal de registrar pago, modal de detalle con
+    historial de pagos y botones de cancelar/liquidar) — ambos dentro del grupo R.H.
+  - Probado de punta a punta contra Neon: candado de "un destajo activo por concepto" (409 al
+    intentar duplicar), captura de avance en el concepto reflejándose automáticamente en el monto
+    ganado del destajo sin captura aparte, pago dentro de saldo, pago que excede saldo (422),
+    cierre del destajo, pago bloqueado después de cerrado (409), y el concepto vuelve a quedar
+    disponible para un destajo nuevo tras cancelar el anterior — datos de prueba eliminados
+    después.

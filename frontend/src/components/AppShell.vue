@@ -105,6 +105,8 @@ const grupos = [
       { to: '/asistencia', label: 'Asistencia' },
       { to: '/incidencias', label: 'Incidencias' },
       { to: '/pagos-personal', label: 'Pagos a Personal' },
+      { to: '/destajistas', label: 'Destajistas' },
+      { to: '/destajos', label: 'Destajos' },
       { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },
     ],
   },
