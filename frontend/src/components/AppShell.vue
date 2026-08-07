@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-100">
+  <div class="min-h-screen bg-halo">
     <header class="bg-primary text-white border-b-[3px] border-brand-red no-print">
       <div class="max-w-6xl mx-auto px-[30px] py-[18px] flex items-center gap-[24px] flex-wrap">
         <BrandMark :size="51" />

@@ -57,6 +57,38 @@ textarea:not(header textarea) {
   font-size: 13px !important;
 }
 
+/* Fondo general del sistema: azul de halo (#2563EB, pedido explícito del usuario — tono medio
+   vibrante). El header y la barra de menús agrupados ya tienen su propio fondo (bg-primary /
+   bg-white respectivamente) y no se ven afectados. Todo lo que antes vivía "suelto" sobre el
+   fondo gris claro (títulos de sección, descripciones cortas, botones tipo outline) ahora queda
+   sobre este azul, así que necesita contraste; lo que ya vive dentro de una tarjeta clara
+   (bg-white, bg-slate-50, etc.) conserva sus colores originales sin ningún cambio — se restauran
+   explícitamente abajo apoyándose en la herencia normal de `color` en CSS. */
+main {
+  color: #fff;
+}
+main .bg-white,
+main .bg-slate-50,
+main .bg-slate-100,
+main .bg-slate-200,
+main .bg-red-50,
+main .bg-emerald-50,
+main .bg-amber-50,
+main .bg-sky-50,
+table {
+  color: #0f172a;
+}
+
+/* Texto secundario (descripciones, etiquetas) y bordes de botones "outline" que quedan sueltos
+   sobre el azul (fuera de cualquier tarjeta clara) se aclaran para dar contraste real; el mismo
+   texto/borde, cuando SÍ está dentro de una tarjeta clara, queda excluido y no cambia. */
+main :is(.text-slate-400, .text-slate-500, .text-slate-600):not(.bg-white *):not(.bg-slate-50 *):not(.bg-slate-100 *):not(.bg-slate-200 *):not(.bg-red-50 *):not(.bg-emerald-50 *):not(.bg-amber-50 *):not(.bg-sky-50 *):not(table *) {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+main .border-slate-300:not(.bg-white *):not(.bg-slate-50 *):not(.bg-slate-100 *):not(.bg-slate-200 *):not(.bg-red-50 *):not(.bg-emerald-50 *):not(.bg-amber-50 *):not(.bg-sky-50 *):not(table *) {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
 @media print {
   .no-print {
     display: none !important;
