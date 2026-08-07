@@ -5,7 +5,7 @@
       <BotonVolver fallback="/pagos" />
       <h2 class="font-display text-[36px] mb-1">{{ pago.folio }}</h2>
       <p class="text-xs text-slate-500 mb-5">
-        {{ pago.proveedor_nombre }} · {{ pago.forma_pago }} · {{ pago.referencia || 'sin referencia' }} ·
+        {{ pago.proveedor_nombre }} · {{ FORMAS_PAGO_TEXTO[pago.forma_pago] || pago.forma_pago }} · {{ pago.referencia || 'sin referencia' }} ·
         Registró: {{ pago.registro_nombre }} · {{ new Date(pago.fecha).toLocaleDateString('es-MX') }}
       </p>
 
@@ -44,6 +44,7 @@ import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
+import { FORMAS_PAGO_TEXTO } from '../lib/formasPago.js';
 
 const route = useRoute();
 const pago = ref(null);

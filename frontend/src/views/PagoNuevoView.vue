@@ -16,7 +16,10 @@
       </div>
       <div>
         <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Forma de pago</label>
-        <input v-model="formaPago" placeholder="Transferencia, cheque…" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" />
+        <select v-model="formaPago" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]">
+          <option value="" disabled>Selecciona…</option>
+          <option v-for="f in FORMAS_PAGO" :key="f.clave" :value="f.clave">{{ f.label }}</option>
+        </select>
       </div>
       <div>
         <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Referencia</label>
@@ -74,6 +77,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import { api } from '../lib/api.js';
+import { FORMAS_PAGO } from '../lib/formasPago.js';
 
 const router = useRouter();
 const proveedores = ref([]);

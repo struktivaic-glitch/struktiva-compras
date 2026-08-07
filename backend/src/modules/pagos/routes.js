@@ -6,6 +6,11 @@ import { actualizarEstatusPagoFactura } from '../facturas/routes.js';
 // Bloque 16: candado de cambio de precio — no se le puede aplicar un pago a una factura con
 // variación de precio ≥5% sobre lo negociado en la OC hasta que Dirección la autorice.
 const UMBRAL_VARIACION_PRECIO = 0.05;
+
+// Formas de pago fijas (07/08/2026, pedido del usuario) — antes era texto libre. El CHECK de la
+// base de datos (migración 028) ya es el candado real; esta validación es solo para devolver un
+// mensaje de error legible en vez del error crudo de Postgres.
+const FORMAS_PAGO_VALIDAS = new Set(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito']);
 const EXCEDE_VARIACION_SQL = `EXISTS (
   SELECT 1 FROM factura_detalle fd
   JOIN oc_detalle od ON od.oc_id = f.oc_id AND od.insumo_id = fd.insumo_id
@@ -79,6 +84,9 @@ export default async function pagosRoutes(app) {
     const { proveedorId, monto, moneda, formaPago, referencia, aplicaciones } = request.body ?? {};
     if (!proveedorId || !monto || !formaPago?.trim() || !Array.isArray(aplicaciones) || aplicaciones.length === 0) {
       return reply.code(400).send({ error: 'Proveedor, monto, forma de pago y al menos una factura aplicada son obligatorios' });
+    }
+    if (!FORMAS_PAGO_VALIDAS.has(formaPago)) {
+      return reply.code(400).send({ error: 'Forma de pago inválida (efectivo, transferencia, tarjeta de débito o tarjeta de crédito)' });
     }
 
     const sumaAplicada = aplicaciones.reduce((s, a) => s + Number(a.montoAplicado), 0);

@@ -2,6 +2,9 @@ import { pool, withTransaction } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
 import { siguienteFolio } from '../../lib/folio.js';
 
+const MIME_FOTO_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const FOTO_MAX_BYTES = 10 * 1024 * 1024;
+
 async function cargarSalidaCompleta(client, id) {
   const { rows: cab } = await client.query(
     `SELECT sa.*, o.nombre AS obra_nombre, f.nombre AS frente_nombre, u.nombre AS entrego_nombre
@@ -21,7 +24,13 @@ async function cargarSalidaCompleta(client, id) {
     [id]
   );
 
-  return { ...cab[0], detalle };
+  const { rows: fotos } = await client.query(
+    `SELECT id, tipo, nombre_archivo, mime, tamano_bytes, creado_en
+     FROM fotos_salida_almacen WHERE salida_id = $1 ORDER BY creado_en DESC`,
+    [id]
+  );
+
+  return { ...cab[0], detalle, fotos };
 }
 
 export default async function salidasAlmacenRoutes(app) {
@@ -108,5 +117,68 @@ export default async function salidasAlmacenRoutes(app) {
       request.log.error(err);
       return reply.code(500).send({ error: 'No se pudo registrar la salida de almacén' });
     }
+  });
+
+  // --- Fotos de evidencia (personal que recibió / material entregado) — pedido del usuario 07/08/2026 ---
+
+  app.post('/api/salidas-almacen/:id/fotos', { preHandler: app.requireRole('almacenista', 'direccion') }, async (request, reply) => {
+    const { id } = request.params;
+    const { rows: existe } = await pool.query('SELECT id FROM salidas_almacen WHERE id = $1', [id]);
+    if (!existe[0]) return reply.code(404).send({ error: 'Salida de almacén no encontrada' });
+
+    let tipo = null;
+    let archivo = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file' && part.fieldname === 'archivo') {
+        if (!MIME_FOTO_PERMITIDOS.has(part.mimetype)) {
+          return reply.code(400).send({ error: 'Formato no soportado. Usa JPG, PNG o WEBP.' });
+        }
+        const buffer = await part.toBuffer();
+        if (buffer.length > FOTO_MAX_BYTES) {
+          return reply.code(400).send({ error: 'La foto es demasiado grande (máx. 10 MB).' });
+        }
+        archivo = { buffer, mimetype: part.mimetype, filename: part.filename };
+      } else if (part.fieldname === 'tipo') {
+        tipo = part.value;
+      }
+    }
+    if (!['personal', 'material'].includes(tipo)) {
+      return reply.code(400).send({ error: 'Tipo de foto inválido (personal o material)' });
+    }
+    if (!archivo) return reply.code(400).send({ error: 'No se recibió ninguna foto' });
+
+    const { rows } = await pool.query(
+      `INSERT INTO fotos_salida_almacen (salida_id, tipo, nombre_archivo, mime, archivo, tamano_bytes, subido_por)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, tipo, nombre_archivo, mime, tamano_bytes, creado_en`,
+      [id, tipo, archivo.filename || 'foto.jpg', archivo.mimetype, archivo.buffer, archivo.buffer.length, request.user.sub]
+    );
+    await registrarBitacora(pool, {
+      tabla: 'fotos_salida_almacen', registroId: rows[0].id, usuarioId: request.user.sub, accion: 'crear',
+      despues: { salidaId: id, tipo },
+    });
+    return reply.code(201).send(rows[0]);
+  });
+
+  app.get('/api/salidas-almacen/:id/fotos/:fotoId', async (request, reply) => {
+    const { rows } = await pool.query(
+      'SELECT archivo, mime, nombre_archivo FROM fotos_salida_almacen WHERE id = $1 AND salida_id = $2',
+      [request.params.fotoId, request.params.id]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Foto no encontrada' });
+    reply.header('Cache-Control', 'private, max-age=60');
+    return reply.type(rows[0].mime).send(rows[0].archivo);
+  });
+
+  app.delete('/api/salidas-almacen/:id/fotos/:fotoId', { preHandler: app.requireRole('almacenista', 'direccion') }, async (request, reply) => {
+    const { rowCount } = await pool.query(
+      'DELETE FROM fotos_salida_almacen WHERE id = $1 AND salida_id = $2',
+      [request.params.fotoId, request.params.id]
+    );
+    if (!rowCount) return reply.code(404).send({ error: 'Foto no encontrada' });
+    await registrarBitacora(pool, {
+      tabla: 'fotos_salida_almacen', registroId: request.params.fotoId, usuarioId: request.user.sub, accion: 'eliminar',
+    });
+    return { ok: true };
   });
 }

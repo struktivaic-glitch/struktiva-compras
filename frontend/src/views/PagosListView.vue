@@ -23,7 +23,7 @@
             <td class="px-4 py-2.5 font-semibold">{{ p.folio }}</td>
             <td class="px-4 py-2.5 font-sans">{{ p.proveedor_nombre }}</td>
             <td class="px-4 py-2.5">{{ mxn(p.monto) }}</td>
-            <td class="px-4 py-2.5 font-sans">{{ p.forma_pago }}</td>
+            <td class="px-4 py-2.5 font-sans">{{ FORMAS_PAGO_TEXTO[p.forma_pago] || p.forma_pago }}</td>
             <td class="px-4 py-2.5">{{ new Date(p.fecha).toLocaleDateString('es-MX') }}</td>
           </tr>
           <tr v-if="!cargando && pagos.length === 0">
@@ -39,6 +39,7 @@
 import { onMounted, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import { api } from '../lib/api.js';
+import { FORMAS_PAGO_TEXTO } from '../lib/formasPago.js';
 
 const pagos = ref([]);
 const cargando = ref(true);

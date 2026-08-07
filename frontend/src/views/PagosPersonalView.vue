@@ -98,11 +98,13 @@
               <span class="inline-flex text-[11.5px] font-bold px-2.5 py-0.5 rounded-full" :class="p.estatus === 'pagado' ? 'bg-emerald-50 text-success' : 'bg-amber-50 text-warning'">
                 {{ ESTATUS_TEXTO[p.estatus] }}
               </span>
-              <div v-if="p.estatus === 'pagado'" class="text-[11px] text-slate-400 mt-0.5">{{ p.pagado_por_nombre }} · {{ formatoFecha(p.fecha_pago) }}</div>
+              <div v-if="p.estatus === 'pagado'" class="text-[11px] text-slate-400 mt-0.5">
+                {{ p.pagado_por_nombre }} · {{ formatoFecha(p.fecha_pago) }}<template v-if="p.forma_pago"> · {{ FORMAS_PAGO_TEXTO[p.forma_pago] }}</template>
+              </div>
             </td>
             <td v-if="puedeCapturar" class="px-4 py-2.5 space-x-2 no-print">
               <template v-if="p.estatus === 'pendiente'">
-                <button v-if="auth.rol === 'direccion'" class="text-xs font-semibold text-success underline" @click="marcarPagado(p)">Marcar pagado</button>
+                <button v-if="auth.rol === 'direccion'" class="text-xs font-semibold text-success underline" @click="abrirMarcarPagado(p)">Marcar pagado</button>
                 <button class="text-xs font-semibold text-danger underline" @click="cancelar(p)">Cancelar</button>
               </template>
             </td>
@@ -120,6 +122,24 @@
         </tfoot>
       </table>
     </div>
+
+    <div v-if="pagoMarcando" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print" @click.self="pagoMarcando = null">
+      <div class="bg-white rounded-xl p-5 w-full max-w-sm">
+        <h3 class="text-sm font-display mb-1">Marcar pagado</h3>
+        <p class="text-xs text-slate-500 mb-4">{{ pagoMarcando.trabajador_nombre }} · {{ mxn(pagoMarcando.monto) }}</p>
+        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Forma de pago</label>
+        <select v-model="formaPagoMarcar" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] mb-4">
+          <option value="" disabled>Selecciona…</option>
+          <option v-for="f in FORMAS_PAGO" :key="f.clave" :value="f.clave">{{ f.label }}</option>
+        </select>
+        <div class="flex gap-2 justify-end">
+          <button class="min-h-[42px] border border-slate-300 text-slate-600 font-bold rounded-lg px-4 text-sm" @click="pagoMarcando = null">Cancelar</button>
+          <button class="min-h-[42px] bg-primary text-white font-bold rounded-lg px-4 text-sm disabled:opacity-50" :disabled="!formaPagoMarcar || marcandoPagado" @click="confirmarMarcarPagado">
+            {{ marcandoPagado ? 'Guardando…' : 'Confirmar' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </AppShell>
 </template>
 
@@ -128,6 +148,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import ReportePrintHeader from '../components/ReportePrintHeader.vue';
 import { api } from '../lib/api.js';
+import { FORMAS_PAGO, FORMAS_PAGO_TEXTO } from '../lib/formasPago.js';
 import { useAuthStore } from '../stores/auth.js';
 
 const auth = useAuthStore();
@@ -143,6 +164,9 @@ const mensaje = ref('');
 const guardando = ref(false);
 const calculando = ref(false);
 const sugerencia = ref(null);
+const pagoMarcando = ref(null);
+const formaPagoMarcar = ref('');
+const marcandoPagado = ref(false);
 
 const form = reactive({ trabajadorId: null, fechaInicio: '', fechaFin: '', concepto: 'Pago de personal', diasTrabajados: null, monto: null, notas: '' });
 
@@ -201,13 +225,24 @@ async function crear() {
   }
 }
 
-async function marcarPagado(p) {
+function abrirMarcarPagado(p) {
+  pagoMarcando.value = p;
+  formaPagoMarcar.value = '';
+  error.value = '';
+}
+
+async function confirmarMarcarPagado() {
+  if (!formaPagoMarcar.value) return;
+  marcandoPagado.value = true;
   error.value = '';
   try {
-    await api.post(`/pagos-personal/${p.id}/marcar-pagado`, {});
+    await api.post(`/pagos-personal/${pagoMarcando.value.id}/marcar-pagado`, { formaPago: formaPagoMarcar.value });
+    pagoMarcando.value = null;
     await cargar();
   } catch (err) {
     error.value = err.response?.data?.error || 'No se pudo marcar como pagado.';
+  } finally {
+    marcandoPagado.value = false;
   }
 }
 

@@ -801,3 +801,40 @@ cambio de estructura de base de datos.
     destajo" en Destajos, y un `<select>` dentro de una tarjeta blanca en Requisición Nueva (para
     confirmar que no hay regresión) — los 5 dieron `bg:#fff / color:#0f172a`, ninguno quedó
     invisible. No se encontró ningún caso adicional pendiente en este barrido.
+
+- **Bloque 33** (07/08/2026): 4 de las 5 ideas anotadas el mismo día (la 4, checklist de módulos
+  por usuario, se dejó pendiente de platicar el esquema y alcances). Migraciones 026-028.
+  - **Fotos en Entrada de Almacén** (remisión + embarque): tablas `fotos_entrada_almacen` /
+    `fotos_salida_almacen` (BYTEA, mismo patrón que `documentos_personal`), varias fotos por tipo
+    permitidas desde el inicio. Rutas de subir/ver/eliminar (rol Almacenista/Dirección, igual que
+    la captura de entradas/salidas). UI en `EntradaAlmacenDetalleView.vue` y
+    `SalidaAlmacenDetalleView.vue`: dos secciones con `<input type="file" capture="environment">`
+    (cámara trasera) y miniaturas. Importante: el endpoint de fotos requiere JWT (va en el header
+    vía el interceptor de axios), así que las miniaturas NO se cargan con un `<img src="...">`
+    directo — se traen como blob autenticado y se arma un object URL en memoria, igual que
+    `AvatarUsuario.vue`.
+  - **Fotos en Salida de Almacén** (personal que recibió + material entregado): mismo patrón y
+    mismo componente de subida, tipos `personal`/`material`. "Personal" es evidencia fotográfica
+    revisable, no biometría — mismo criterio ya usado en el selfie opcional de Asistencia.
+  - **Ligar factura con Entrada de Almacén**: tabla `factura_entrada` (muchos-a-muchos). En
+    `FacturaNuevaView.vue`, al elegir la OC aparece un checklist de sus entradas de almacén
+    (`GET /entradas-almacen?ocId=`, filtro nuevo) para marcar a cuál(es) remisión(es) corresponde
+    la factura — opcional, no afecta el three-way matching existente (que sigue comparando
+    factura vs. OC). El backend valida que las entradas marcadas pertenezcan a esa OC antes de
+    guardarlas. Se muestran como enlaces en `FacturaDetalleView.vue`.
+  - **Formas de pago fijas** (efectivo/transferencia/tarjeta de débito/tarjeta de crédito):
+    `pagos_proveedor.forma_pago` pasó de texto libre a `CHECK` (no había datos previos que
+    normalizar); `pagos_personal` ganó la misma columna, capturada al "Marcar pagado" (antes no
+    existía ahí — decisión del usuario de aplicarlo también a Personal, no solo a Proveedor). En
+    `PagosPersonalView.vue` "Marcar pagado" ahora abre un modal pidiendo la forma de pago antes de
+    confirmar. Nuevo `frontend/src/lib/formasPago.js` centraliza el catálogo de 4 opciones — se
+    usa en 5 vistas (antes cada una lo hubiera repetido a mano) para que el texto mostrado en
+    `PagosListView`, `PagoDetalleView` y `ExpedienteView` no muestre la clave cruda
+    (`tarjeta_debito`) sino la etiqueta (`Tarjeta de débito`).
+  - Probado de punta a punta contra Neon (usuario `direccion`/`almacen`): subida y eliminación de
+    foto de remisión y de embarque en una entrada real, subida y eliminación de foto de personal
+    en una salida real, factura nueva ligada a una entrada real (se vio correctamente en el
+    detalle), pago a proveedor con forma de pago fija aplicado a esa factura, y "Marcar pagado" de
+    un pago a personal con el modal de forma de pago — datos de prueba (factura, pago a
+    proveedor, pago a personal, fotos) eliminados después sin tocar los registros reales de
+    entradas/salidas ya existentes.

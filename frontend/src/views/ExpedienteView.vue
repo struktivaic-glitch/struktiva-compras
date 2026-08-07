@@ -156,7 +156,7 @@
               <div>
                 <div class="text-[10.5px] uppercase tracking-wide text-slate-500 font-sans">7 · Pago a proveedor</div>
                 <div class="font-bold text-sm text-primary">{{ p.folio }}</div>
-                <div class="text-xs text-slate-500 font-sans">{{ p.forma_pago }}</div>
+                <div class="text-xs text-slate-500 font-sans">{{ FORMAS_PAGO_TEXTO[p.forma_pago] || p.forma_pago }}</div>
               </div>
               <div class="font-display tabular-nums text-sm">{{ mxn(p.monto) }}</div>
             </RouterLink>
@@ -177,6 +177,7 @@ import { useRoute } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
+import { FORMAS_PAGO_TEXTO } from '../lib/formasPago.js';
 
 const route = useRoute();
 const datos = ref(null);

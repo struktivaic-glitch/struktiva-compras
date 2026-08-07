@@ -21,6 +21,11 @@
         <a v-if="factura.pdf_url" :href="factura.pdf_url" target="_blank" class="text-xs font-semibold text-primary underline">Descargar PDF</a>
       </div>
 
+      <p v-if="factura.entradas?.length" class="text-xs text-slate-500 mb-4">
+        Entrada(s) relacionada(s):
+        <RouterLink v-for="(e, i) in factura.entradas" :key="e.id" :to="`/almacen/entradas/${e.id}`" class="text-primary underline font-semibold">{{ e.folio }}<span v-if="i < factura.entradas.length - 1">, </span></RouterLink>
+      </p>
+
       <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 mb-4">{{ error }}</p>
 
       <div v-if="factura.hayVariacionSinAutorizar" class="bg-amber-50 border border-warning/30 text-warning text-sm rounded-lg px-4 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">

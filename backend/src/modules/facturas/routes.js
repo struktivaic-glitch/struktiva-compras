@@ -67,9 +67,20 @@ async function cargarFacturaCompleta(client, id) {
     [id, UMBRAL_VARIACION_PRECIO, cab[0].oc_id]
   );
 
+  // Bloque de trazabilidad (07/08/2026): entradas de almacén (remisiones) que el usuario ligó
+  // a esta factura al capturarla — no es parte del three-way matching (que sigue comparando
+  // factura vs. OC), es información adicional de a qué recepción física corresponde.
+  const { rows: entradas } = await client.query(
+    `SELECT ea.id, ea.folio, ea.remision_proveedor, ea.fecha
+     FROM factura_entrada fe JOIN entradas_almacen ea ON ea.id = fe.entrada_id
+     WHERE fe.factura_id = $1 ORDER BY ea.fecha`,
+    [id]
+  );
+
   return {
     ...cab[0],
     detalle,
+    entradas,
     hayVariacionSinAutorizar: detalle.some((d) => d.excede_variacion_precio) && !cab[0].variacion_precio_autorizada,
   };
 }
@@ -129,6 +140,12 @@ export default async function facturasRoutes(app) {
     } catch {
       return reply.code(400).send({ error: 'Detalle de factura inválido' });
     }
+    let entradaIds;
+    try {
+      entradaIds = JSON.parse(fields.entradaIds || '[]');
+    } catch {
+      return reply.code(400).send({ error: 'Entradas relacionadas inválidas' });
+    }
 
     if (!ocId || !subtotal || !Array.isArray(detalle) || detalle.length === 0) {
       return reply.code(400).send({ error: 'OC, subtotal y al menos un renglón facturado son obligatorios' });
@@ -138,6 +155,18 @@ export default async function facturasRoutes(app) {
       const resultado = await withTransaction(async (client) => {
         const { rows: ocRows } = await client.query('SELECT proveedor_id, folio FROM ordenes_compra WHERE id = $1 FOR UPDATE', [ocId]);
         if (!ocRows[0]) throw Object.assign(new Error('NOT_FOUND'), { code: 404 });
+
+        let entradaIdsValidos = [];
+        if (Array.isArray(entradaIds) && entradaIds.length > 0) {
+          const { rows: entradasOc } = await client.query(
+            'SELECT id FROM entradas_almacen WHERE oc_id = $1 AND id = ANY($2::int[])',
+            [ocId, entradaIds]
+          );
+          if (entradasOc.length !== entradaIds.length) {
+            throw Object.assign(new Error('ENTRADA_FUERA_DE_OC'), { code: 400 });
+          }
+          entradaIdsValidos = entradasOc.map((e) => e.id);
+        }
 
         const disponible = await disponibleParaFacturar(client, ocId);
         const porInsumo = new Map(disponible.map((d) => [d.insumo_id, d]));
@@ -184,6 +213,13 @@ export default async function facturasRoutes(app) {
           );
         }
 
+        for (const entradaId of entradaIdsValidos) {
+          await client.query(
+            `INSERT INTO factura_entrada (factura_id, entrada_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [facturaId, entradaId]
+          );
+        }
+
         await registrarBitacora(client, {
           tabla: 'facturas', registroId: facturaId, usuarioId: request.user.sub,
           accion: 'crear', despues: { folio, ocId, total, detalle },
@@ -206,6 +242,7 @@ export default async function facturasRoutes(app) {
       return reply.code(201).send(resultado);
     } catch (err) {
       if (err.code === 404) return reply.code(404).send({ error: 'Orden de compra no encontrada' });
+      if (err.code === 400) return reply.code(400).send({ error: 'Una de las entradas seleccionadas no pertenece a esta Orden de Compra' });
       if (err.code === 422) {
         return reply.code(422).send({
           error: 'Validación antifraude: uno o más insumos facturan más de lo físicamente recibido y no vinculado a factura previa',

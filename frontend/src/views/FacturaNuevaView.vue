@@ -30,6 +30,18 @@
 
     <p v-if="error" class="bg-red-50 border border-danger/30 text-danger text-sm rounded-lg px-4 py-3 mb-4">{{ error }}</p>
 
+    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-5">
+      <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Entrada(s) relacionada(s) (opcional)</label>
+      <p class="text-xs text-slate-500 mb-2">A qué remisión(es) recibida(s) en almacén corresponde esta factura — solo trazabilidad, no afecta el three-way matching.</p>
+      <div v-if="entradasOc.length" class="flex flex-col gap-1.5">
+        <label v-for="e in entradasOc" :key="e.id" class="flex items-center gap-2 text-sm">
+          <input type="checkbox" :value="e.id" v-model="entradaIdsSeleccionadas" class="w-4 h-4" />
+          {{ e.folio }} — Remisión {{ e.remision_proveedor }} · {{ new Date(e.fecha).toLocaleDateString('es-MX') }}
+        </label>
+      </div>
+      <p v-else class="text-sm text-slate-400">Esta Orden de Compra no tiene entradas de almacén registradas todavía.</p>
+    </div>
+
     <div v-if="lineas.length" class="overflow-x-auto bg-white border border-slate-200 rounded-xl mb-5">
       <table class="w-full text-sm tabular-nums">
         <thead>
@@ -92,6 +104,16 @@ const xmlFile = ref(null);
 const pdfFile = ref(null);
 const error = ref('');
 const guardando = ref(false);
+const entradasOc = ref([]);
+const entradaIdsSeleccionadas = ref([]);
+
+async function cargarEntradasOc() {
+  entradaIdsSeleccionadas.value = [];
+  if (!ocId.value) { entradasOc.value = []; return; }
+  const { data } = await api.get('/entradas-almacen', { params: { ocId: ocId.value } });
+  entradasOc.value = data;
+}
+watch(ocId, cargarEntradasOc);
 
 const subtotalCalculado = computed(() =>
   lineas.value.reduce((s, l) => s + Number(cantidades[l.insumo_id] || 0) * Number(precios[l.insumo_id] || 0), 0)
@@ -127,6 +149,7 @@ async function guardar() {
     form.append('subtotal', subtotalCalculado.value.toFixed(2));
     form.append('iva', Number(iva.value || 0).toFixed(2));
     form.append('detalle', JSON.stringify(detalle));
+    form.append('entradaIds', JSON.stringify(entradaIdsSeleccionadas.value));
     if (xmlFile.value) form.append('xml', xmlFile.value);
     if (pdfFile.value) form.append('pdf', pdfFile.value);
 
@@ -143,6 +166,6 @@ onMounted(async () => {
   const { data } = await api.get('/ordenes-compra', { params: { estatus: 'confirmada' } });
   ordenes.value = data;
   ocId.value = data[0]?.id ?? null;
-  await cargarDisponible();
+  await Promise.all([cargarDisponible(), cargarEntradasOc()]);
 });
 </script>

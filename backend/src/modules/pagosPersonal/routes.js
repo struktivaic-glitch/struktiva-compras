@@ -7,6 +7,10 @@ import { registrarBitacora } from '../../lib/audit.js';
 // no mueve dinero real ni calcula ISR/IMSS.
 
 const ROLES_CAPTURAR = ['residente', 'superintendente', 'direccion'];
+// Formas de pago fijas (07/08/2026, pedido del usuario) — antes pagos_personal ni siquiera tenía
+// este campo. El CHECK de la base de datos (migración 028) es el candado real; esto es solo para
+// un mensaje de error legible.
+const FORMAS_PAGO_VALIDAS = new Set(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito']);
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -116,14 +120,17 @@ export default async function pagosPersonalRoutes(app) {
 
   app.post('/api/pagos-personal/:id/marcar-pagado', { preHandler: app.requireRole('direccion') }, async (request, reply) => {
     const { id } = request.params;
-    const { fechaPago } = request.body ?? {};
+    const { fechaPago, formaPago } = request.body ?? {};
+    if (!FORMAS_PAGO_VALIDAS.has(formaPago)) {
+      return reply.code(400).send({ error: 'Forma de pago inválida (efectivo, transferencia, tarjeta de débito o tarjeta de crédito)' });
+    }
     const { rows: existentes } = await pool.query('SELECT estatus FROM pagos_personal WHERE id = $1', [id]);
     if (!existentes[0]) return reply.code(404).send({ error: 'Registro no encontrado' });
     if (existentes[0].estatus === 'pagado') return reply.code(422).send({ error: 'Ya está marcado como pagado' });
 
     const { rows } = await pool.query(
-      `UPDATE pagos_personal SET estatus = 'pagado', fecha_pago = $2, pagado_por = $3 WHERE id = $1 RETURNING *`,
-      [id, fechaPago || hoy(), request.user.sub]
+      `UPDATE pagos_personal SET estatus = 'pagado', fecha_pago = $2, pagado_por = $3, forma_pago = $4 WHERE id = $1 RETURNING *`,
+      [id, fechaPago || hoy(), request.user.sub, formaPago]
     );
     await registrarBitacora(pool, {
       tabla: 'pagos_personal', registroId: id, usuarioId: request.user.sub, accion: 'marcar_pagado', despues: rows[0],
