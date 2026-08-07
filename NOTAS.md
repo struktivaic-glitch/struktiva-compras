@@ -854,3 +854,12 @@ cambio de estructura de base de datos.
   - Probado contra Neon: filtro de proveedor sin coincidencias (mensaje correcto) y "Quitar
     filtros" restaurando el listado completo en Entradas; búsqueda parcial insensible a
     mayúsculas ("pedr" encontrando "PEDRO") y sin coincidencias en Salidas.
+  - **Nota de caché de la PWA, no relacionada con este cambio en particular pero detectada al
+    verificar este deploy**: la primera vez que se abrió `/almacen/entradas` en producción tras
+    el deploy, el *service worker* de la PWA sirvió una versión cacheada de la pantalla sin la
+    barra de filtros — no era un problema del deploy (el bundle nuevo ya estaba arriba, confirmado
+    por hora de modificación), sino la caché del navegador de esa sesión. Al desregistrar el
+    service worker y recargar, apareció correcto. Si en el equipo alguien no ve un cambio
+    reciente del sistema, probablemente sea esto — cerrar y reabrir la pestaña (o, en el atajo
+    instalado del celular, desinstalar/reinstalar si persiste) lo resuelve; no requiere ninguna
+    acción de nuestro lado.
