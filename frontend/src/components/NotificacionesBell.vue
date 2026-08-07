@@ -1,7 +1,7 @@
 <template>
   <div class="relative">
     <button
-      class="relative w-[54px] h-[54px] rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20"
+      class="relative w-[54px] h-[54px] rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.6)]"
       title="Notificaciones"
       @click="abierto = !abierto"
     >

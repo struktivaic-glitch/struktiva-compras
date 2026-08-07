@@ -14,7 +14,7 @@
             :nombre="auth.usuario?.nombre"
             :tiene-foto="auth.usuario?.tieneFoto !== false"
             :version="auth.usuario?.fotoVersion"
-            size-class="w-[54px] h-[54px] border border-white/20"
+            size-class="w-[54px] h-[54px] border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.6)]"
             text-size-class="text-[20px]"
           />
         </RouterLink>

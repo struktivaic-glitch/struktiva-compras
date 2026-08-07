@@ -149,7 +149,7 @@
       </div>
 
       <div class="flex flex-wrap gap-2 no-print">
-        <RouterLink :to="`/expediente/${req.id}`" class="min-h-[44px] flex items-center border border-slate-300 text-slate-600 font-bold rounded-lg px-5 text-sm">
+        <RouterLink :to="`/expediente/${req.id}`" class="min-h-[30px] flex items-center border border-slate-300 text-slate-600 font-bold rounded-lg px-5 text-[13px]">
           Ver expediente completo
         </RouterLink>
         <button

@@ -2,7 +2,7 @@
   <AppShell>
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-display text-[36px]">Entradas de almacén</h2>
-      <RouterLink to="/almacen/entradas/nueva" class="min-h-[40px] flex items-center bg-primary text-white text-sm font-bold rounded-lg px-4">
+      <RouterLink to="/almacen/entradas/nueva" class="min-h-[30px] flex items-center bg-primary text-white text-[13px] font-bold rounded-lg px-4">
         + Nueva entrada
       </RouterLink>
     </div>

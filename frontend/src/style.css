@@ -35,6 +35,28 @@ button:not(header button) {
   padding-bottom: 0 !important;
 }
 
+/* Los RouterLink con estilo de botón (ej. "+ Nueva requisición") ya se ajustaron directo en cada
+   vista a 30px/13px — este selector es un respaldo por si aparece alguno nuevo sin tocar. */
+a.min-h-\[30px\] {
+  font-size: 13px !important;
+}
+
+/* Mismo criterio que los botones: todas las celdas de captura de datos (inputs/selects) quedan
+   en 30px de alto mínimo y 13px de texto, salvo dentro del header. Se excluyen checkbox/radio/
+   file porque son controles nativos del navegador, no "celdas de rellenar datos". Los textarea
+   solo reciben el tamaño de texto — son multilínea, quitarles el padding vertical se ve mal con
+   varios renglones. */
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not(header input),
+select:not(header select) {
+  min-height: 30px !important;
+  font-size: 13px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+textarea:not(header textarea) {
+  font-size: 13px !important;
+}
+
 @media print {
   .no-print {
     display: none !important;

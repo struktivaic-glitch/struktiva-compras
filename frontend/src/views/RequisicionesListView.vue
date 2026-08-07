@@ -12,7 +12,7 @@
           <option value="atendida_total">Atendida total</option>
           <option value="cancelada">Cancelada</option>
         </select>
-        <RouterLink to="/requisiciones/nueva" class="min-h-[40px] flex items-center bg-primary text-white text-sm font-bold rounded-lg px-4">
+        <RouterLink to="/requisiciones/nueva" class="min-h-[30px] flex items-center bg-primary text-white text-[13px] font-bold rounded-lg px-4">
           + Nueva requisición
         </RouterLink>
       </div>

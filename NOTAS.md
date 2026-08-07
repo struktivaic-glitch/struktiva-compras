@@ -636,3 +636,25 @@ cambio de estructura de base de datos.
     dentro de `<header>` (campanita y "Salir") quedan excluidos automáticamente por el selector.
     Verificado en el navegador: campanita/avatar siguen en 54px y STRUKTIVA en 34px (sin tocar),
     botones normales y de modales a exactamente 30px/13px en varias pantallas distintas.
+  - Cuarta vuelta: mismo criterio pero para **celdas de captura de datos** (`input`, `select`) —
+    misma regla global en `style.css`, excluyendo `checkbox`/`radio`/`file` (son controles nativos,
+    no "celdas de rellenar") y todo dentro de `<header>`. El `textarea` solo recibió el tamaño de
+    texto (13px), sin quitarle el padding vertical, porque es multilínea y se ve mal con el texto
+    pegado al borde.
+  - De paso se detectó que algunos "botones" en realidad son `RouterLink` (etiqueta `<a>`, no
+    `<button>`) y la regla global de botones no los alcanza — es el caso de "+ Nueva requisición"
+    y enlaces equivalentes en las listas de Cotizaciones, Entradas/Salidas de Almacén, Facturas,
+    Pagos y Requisiciones (7 archivos en total). Se corrigieron uno por uno a 30px/13px
+    directamente en cada vista (no hay una clase común segura para engancharlos por CSS sin
+    arriesgar enlaces de navegación normales), más una regla de respaldo en `style.css`
+    (`a.min-h-\[30px\] { font-size:13px; }`) por si aparece alguno nuevo sin tocar.
+  - Sombra blanca añadida a la campanita de notificaciones y al avatar del usuario en el header
+    (`shadow-[0_0_10px_rgba(255,255,255,0.6)]`), pedido explícito del usuario.
+  - Verificado en el navegador: campos de formulario (selects e input de texto) en `/requisiciones/
+    nueva` a 30px/13px, enlace "+ Nueva requisición" y selector de estatus en `/requisiciones` a
+    30px/13px, campanita y avatar con el boxShadow blanco confirmado por lectura directa del DOM.
+  - Pendiente de ese mismo mensaje del usuario: cambiar el fondo de "la sección" a "azul de halo"
+    con contraste en botones/texto encima — no se implementó todavía porque es ambiguo en dos
+    ejes (qué sección exactamente, y qué tono de azul es "halo") y no hay ninguna definición previa
+    de ese término en el proyecto; se le preguntará directamente antes de tocar nada, dado que un
+    cambio de fondo global mal calibrado afectaría legibilidad en todo el sistema.
