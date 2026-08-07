@@ -586,3 +586,17 @@ cambio de estructura de base de datos.
     detectando correctamente renta y documento próximos a vencer (dentro de 30 días) y
     excluyendo mantenimiento programado más lejano, descarga de documento byte a byte idéntica,
     candado de rol (403 para Almacenista) — datos de prueba eliminados después.
+- **Bloque 32** (07/08/2026): Seguridad e Higiene — cuarto y último punto de la lista original,
+  resuelto tal como se acordó: **sin módulo aparte**, como extensión ligera del Expediente de
+  Personal ya existente. Certificaciones y DC-3 ya cabían como documento del expediente; solo
+  hacía falta poder ponerles una fecha de vigencia para poder avisar cuándo vencen — mismo
+  patrón ya usado en documentos_equipo (Bloque 31).
+  - Migración 025: `documentos_personal.fecha_vencimiento` (columna nueva, nullable).
+  - Backend: la subida de documentos del expediente ahora acepta `fechaVencimiento` opcional;
+    nuevo `GET /api/trabajadores/vencimientos` (mismo patrón que el de Equipos) para
+    certificaciones que vencen en los próximos 30 días de personal activo.
+  - Frontend: nuevo tipo "Certificación / DC-3" en el selector de documentos del Expediente,
+    campo de fecha de vencimiento al subir, aviso de vencimiento visible en cada documento, y
+    panel de "por vencer" en el catálogo de Personal (mismo patrón visual que Equipos).
+  - Probado contra Neon con un trabajador real existente: documento con vencimiento capturado y
+    reflejado en el panel, documento de prueba eliminado después sin tocar al trabajador.

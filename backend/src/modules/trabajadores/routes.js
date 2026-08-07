@@ -12,6 +12,7 @@ import { registrarBitacora } from '../../lib/audit.js';
 const ROLES_GESTION = ['residente', 'superintendente', 'direccion'];
 const MIME_DOC_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 const DOC_MAX_BYTES = 10 * 1024 * 1024;
+const DIAS_ALERTA_VENCIMIENTO = 30;
 
 const CAMPOS_EXPEDIENTE = [
   'tipo', 'puesto', 'obraId', 'fechaIngreso', 'salarioReferencia', 'salarioPeriodo',
@@ -53,6 +54,19 @@ export default async function trabajadoresRoutes(app) {
     return rows;
   });
 
+  // Bloque 32: certificaciones/documentos con fecha de vigencia próxima a vencer — Seguridad e
+  // Higiene resuelto como extensión del Expediente en vez de un módulo aparte.
+  app.get('/api/trabajadores/vencimientos', async () => {
+    const { rows } = await pool.query(
+      `SELECT dp.id, dp.tipo_documento, dp.fecha_vencimiento AS fecha, t.id AS trabajador_id, t.nombre
+       FROM documentos_personal dp JOIN trabajadores t ON t.id = dp.trabajador_id
+       WHERE dp.fecha_vencimiento IS NOT NULL AND dp.fecha_vencimiento <= current_date + ${DIAS_ALERTA_VENCIMIENTO}
+         AND t.activo
+       ORDER BY dp.fecha_vencimiento`
+    );
+    return rows;
+  });
+
   app.get('/api/trabajadores/:id', async (request, reply) => {
     const { rows } = await pool.query(
       `SELECT t.*, o.nombre AS obra_nombre
@@ -64,7 +78,7 @@ export default async function trabajadoresRoutes(app) {
     if (!rows[0]) return reply.code(404).send({ error: 'Personal no encontrado' });
 
     const { rows: documentos } = await pool.query(
-      `SELECT id, tipo_documento, nombre_archivo, mime, tamano_bytes, creado_en
+      `SELECT id, tipo_documento, nombre_archivo, mime, tamano_bytes, fecha_vencimiento, creado_en
        FROM documentos_personal WHERE trabajador_id = $1 ORDER BY creado_en DESC`,
       [request.params.id]
     );
@@ -133,6 +147,7 @@ export default async function trabajadoresRoutes(app) {
     if (!existe[0]) return reply.code(404).send({ error: 'Personal no encontrado' });
 
     let tipoDocumento = 'Otro';
+    let fechaVencimiento = null;
     let archivo = null;
     for await (const part of request.parts()) {
       if (part.type === 'file' && part.fieldname === 'archivo') {
@@ -146,15 +161,17 @@ export default async function trabajadoresRoutes(app) {
         archivo = { buffer, mimetype: part.mimetype, filename: part.filename };
       } else if (part.fieldname === 'tipoDocumento') {
         tipoDocumento = part.value?.trim() || 'Otro';
+      } else if (part.fieldname === 'fechaVencimiento') {
+        fechaVencimiento = part.value?.trim() || null;
       }
     }
     if (!archivo) return reply.code(400).send({ error: 'No se recibió ningún archivo' });
 
     const { rows } = await pool.query(
-      `INSERT INTO documentos_personal (trabajador_id, tipo_documento, nombre_archivo, mime, archivo, tamano_bytes, subido_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, tipo_documento, nombre_archivo, mime, tamano_bytes, creado_en`,
-      [id, tipoDocumento, archivo.filename || 'documento', archivo.mimetype, archivo.buffer, archivo.buffer.length, request.user.sub]
+      `INSERT INTO documentos_personal (trabajador_id, tipo_documento, nombre_archivo, mime, archivo, tamano_bytes, fecha_vencimiento, subido_por)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, tipo_documento, nombre_archivo, mime, tamano_bytes, fecha_vencimiento, creado_en`,
+      [id, tipoDocumento, archivo.filename || 'documento', archivo.mimetype, archivo.buffer, archivo.buffer.length, fechaVencimiento, request.user.sub]
     );
     await registrarBitacora(pool, {
       tabla: 'documentos_personal', registroId: rows[0].id, usuarioId: request.user.sub, accion: 'crear',

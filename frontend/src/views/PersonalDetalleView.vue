@@ -120,6 +120,7 @@
             <div>
               <span class="font-semibold">{{ d.tipo_documento }}</span>
               <span class="text-slate-400 text-xs ml-2">{{ d.nombre_archivo }} · {{ formatoTamano(d.tamano_bytes) }} · {{ formatoFecha(d.creado_en) }}</span>
+              <span v-if="d.fecha_vencimiento" class="block text-[11px] text-warning font-semibold">Vence: {{ formatoFecha(d.fecha_vencimiento) }}</span>
             </div>
             <div class="flex items-center gap-3 flex-none">
               <button class="text-xs font-semibold text-primary underline" @click="verDocumento(d)">Ver</button>
@@ -129,14 +130,18 @@
         </div>
         <p v-else class="text-sm text-slate-400 mb-4">Sin documentos cargados todavía.</p>
 
-        <form v-if="puedeEditar" class="grid sm:grid-cols-3 gap-3 items-end" @submit.prevent="subirDocumento">
+        <form v-if="puedeEditar" class="grid sm:grid-cols-4 gap-3 items-end" @submit.prevent="subirDocumento">
           <div>
             <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Tipo de documento</label>
             <select v-model="nuevoDoc.tipo" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]">
               <option v-for="t in TIPOS_DOCUMENTO" :key="t" :value="t">{{ t }}</option>
             </select>
           </div>
-          <div class="sm:col-span-2">
+          <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Vence (opcional)</label>
+            <input v-model="nuevoDoc.fechaVencimiento" type="date" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" />
+          </div>
+          <div>
             <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Archivo (JPG, PNG, WEBP o PDF)</label>
             <input type="file" accept="image/*,application/pdf" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" @change="alSeleccionarDocumento" />
           </div>
@@ -157,7 +162,7 @@ import BotonVolver from '../components/BotonVolver.vue';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../stores/auth.js';
 
-const TIPOS_DOCUMENTO = ['INE', 'CURP', 'RFC', 'NSS', 'Contrato', 'Comprobante de domicilio', 'Acta de nacimiento', 'Otro'];
+const TIPOS_DOCUMENTO = ['INE', 'CURP', 'RFC', 'NSS', 'Contrato', 'Comprobante de domicilio', 'Acta de nacimiento', 'Certificación / DC-3', 'Otro'];
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -210,7 +215,7 @@ async function guardar() {
   }
 }
 
-const nuevoDoc = reactive({ tipo: 'INE' });
+const nuevoDoc = reactive({ tipo: 'INE', fechaVencimiento: '' });
 const archivoSeleccionado = ref(null);
 const subiendoDoc = ref(false);
 
@@ -225,9 +230,11 @@ async function subirDocumento() {
   try {
     const form2 = new FormData();
     form2.append('tipoDocumento', nuevoDoc.tipo);
+    if (nuevoDoc.fechaVencimiento) form2.append('fechaVencimiento', nuevoDoc.fechaVencimiento);
     form2.append('archivo', archivoSeleccionado.value);
     await api.post(`/trabajadores/${route.params.id}/documentos`, form2);
     archivoSeleccionado.value = null;
+    nuevoDoc.fechaVencimiento = '';
     mensaje.value = 'Documento agregado.';
     await cargar();
   } catch (err) {

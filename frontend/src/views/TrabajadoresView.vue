@@ -13,6 +13,16 @@
       </label>
     </div>
 
+    <div v-if="vencimientos.length" class="bg-amber-50 border border-warning/30 rounded-xl p-4 mb-5">
+      <h3 class="text-xs font-bold uppercase text-warning mb-2">Certificaciones/documentos por vencer en los próximos 30 días ({{ vencimientos.length }})</h3>
+      <ul class="text-sm space-y-1">
+        <li v-for="v in vencimientos" :key="v.id">
+          <RouterLink :to="`/trabajadores/${v.trabajador_id}`" class="text-primary underline">{{ v.nombre }}</RouterLink>
+          — {{ v.tipo_documento }} vence {{ formatoFecha(v.fecha) }}
+        </li>
+      </ul>
+    </div>
+
     <form v-if="puedeCrear" class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-6 gap-3 items-end" @submit.prevent="crear">
       <div class="sm:col-span-2">
         <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Nombre</label>
@@ -106,9 +116,19 @@ const auth = useAuthStore();
 const puedeCrear = ['residente', 'superintendente', 'direccion'].includes(auth.rol);
 const puedeEditar = puedeCrear;
 const trabajadores = ref([]);
+const vencimientos = ref([]);
 const error = ref('');
 const guardando = ref(false);
 const incluirInactivos = ref(false);
+
+function formatoFecha(fecha) {
+  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+async function cargarVencimientos() {
+  const { data } = await api.get('/trabajadores/vencimientos');
+  vencimientos.value = data;
+}
 const form = reactive({ nombre: '', oficio: '', tipo: 'jornalero', puesto: '' });
 const editando = ref(null);
 const edicion = reactive({ nombre: '', oficio: '', activo: true });
@@ -148,5 +168,8 @@ async function crear() {
   }
 }
 
-onMounted(cargar);
+onMounted(() => {
+  cargar();
+  cargarVencimientos();
+});
 </script>
