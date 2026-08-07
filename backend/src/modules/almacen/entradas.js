@@ -70,11 +70,16 @@ async function cargarEntradaCompleta(client, id) {
 export default async function entradasAlmacenRoutes(app) {
   app.addHook('preHandler', app.authenticate);
 
+  // Consulta general de entradas — filtros opcionales para no depender solo del listado plano
+  // (pedido del usuario 07/08/2026): por proveedor, por Orden de Compra, y por rango de fechas.
   app.get('/api/entradas-almacen', async (request) => {
-    const { ocId } = request.query;
+    const { ocId, proveedorId, desde, hasta } = request.query;
     const condiciones = [];
     const valores = [];
     if (ocId) { valores.push(ocId); condiciones.push(`ea.oc_id = $${valores.length}`); }
+    if (proveedorId) { valores.push(proveedorId); condiciones.push(`oc.proveedor_id = $${valores.length}`); }
+    if (desde) { valores.push(desde); condiciones.push(`ea.fecha >= $${valores.length}`); }
+    if (hasta) { valores.push(hasta); condiciones.push(`ea.fecha <= $${valores.length}`); }
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
 
     const { rows } = await pool.query(
@@ -84,7 +89,7 @@ export default async function entradasAlmacenRoutes(app) {
        JOIN ordenes_compra oc ON oc.id = ea.oc_id
        JOIN proveedores pr ON pr.id = oc.proveedor_id
        ${where}
-       ORDER BY ea.creado_en DESC LIMIT 200`,
+       ORDER BY ea.creado_en DESC LIMIT 500`,
       valores
     );
     return rows;

@@ -52,11 +52,25 @@ export default async function salidasAlmacenRoutes(app) {
     return rows;
   });
 
-  app.get('/api/salidas-almacen', async () => {
+  // Consulta general de salidas — filtros opcionales (pedido del usuario 07/08/2026): por
+  // persona que sacó/recibió el material (texto libre, búsqueda parcial), por obra, y por rango
+  // de fechas.
+  app.get('/api/salidas-almacen', async (request) => {
+    const { usuarioRecibeNombre, obraId, desde, hasta } = request.query;
+    const condiciones = [];
+    const valores = [];
+    if (usuarioRecibeNombre) { valores.push(`%${usuarioRecibeNombre}%`); condiciones.push(`sa.usuario_recibe_nombre ILIKE $${valores.length}`); }
+    if (obraId) { valores.push(obraId); condiciones.push(`sa.obra_id = $${valores.length}`); }
+    if (desde) { valores.push(desde); condiciones.push(`sa.fecha >= $${valores.length}`); }
+    if (hasta) { valores.push(hasta); condiciones.push(`sa.fecha <= $${valores.length}`); }
+    const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+
     const { rows } = await pool.query(
       `SELECT sa.id, sa.folio, sa.fecha, sa.usuario_recibe_nombre, o.nombre AS obra_nombre, f.nombre AS frente_nombre
        FROM salidas_almacen sa JOIN obras o ON o.id = sa.obra_id JOIN frentes f ON f.id = sa.frente_id
-       ORDER BY sa.creado_en DESC LIMIT 200`
+       ${where}
+       ORDER BY sa.creado_en DESC LIMIT 500`,
+      valores
     );
     return rows;
   });

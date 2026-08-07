@@ -838,3 +838,19 @@ cambio de estructura de base de datos.
     un pago a personal con el modal de forma de pago — datos de prueba (factura, pago a
     proveedor, pago a personal, fotos) eliminados después sin tocar los registros reales de
     entradas/salidas ya existentes.
+
+- **Filtros de consulta en Entradas y Salidas de Almacén** (07/08/2026): pedido del usuario —
+  antes las listas de `/almacen/entradas` y `/almacen/salidas` eran planas, sin forma de acotar
+  la búsqueda. Sin migración (solo parámetros de consulta nuevos en endpoints existentes).
+  - `GET /entradas-almacen` gana `proveedorId`, `desde`, `hasta`. `GET /salidas-almacen` gana
+    `usuarioRecibeNombre` (texto libre, `ILIKE` parcial — es "quien recibió/sacó el material",
+    campo de texto libre capturado en la salida, no un catálogo), `obraId`, `desde`, `hasta`. Se
+    aprovechó para subir el `LIMIT` de 200 a 500 en ambas, ya que ahora estas pantallas son
+    pensadas para *consultar* historial, no solo ver actividad reciente.
+  - Frontend: barra de filtros arriba de la tabla en ambas vistas (selects/inputs con `@change`,
+    el de texto con `@keyup.enter`/`@blur`), botón "Quitar filtros" que solo aparece si hay algún
+    filtro activo, y el mensaje de "sin resultados" distingue "no hay nada capturado" de "nada
+    coincide con el filtro".
+  - Probado contra Neon: filtro de proveedor sin coincidencias (mensaje correcto) y "Quitar
+    filtros" restaurando el listado completo en Entradas; búsqueda parcial insensible a
+    mayúsculas ("pedr" encontrando "PEDRO") y sin coincidencias en Salidas.
