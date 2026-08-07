@@ -65,6 +65,7 @@ const CATEGORIAS = [
   { clave: 'excedente', label: 'Excedente', descripcion: 'Ajustes de presupuesto excedido autorizados por Superintendencia o Dirección.', ruta: '/requisiciones' },
   { clave: 'orden_compra', label: 'Órdenes de compra', descripcion: 'Órdenes de compra de $20,000 o más, pendientes de autorización de Dirección (o excepción de dos firmas).', ruta: '/ordenes-compra' },
   { clave: 'cambio_precio', label: 'Cambio de precio', descripcion: 'Variaciones de precio (5% o más) en cotizaciones y facturas, pendientes de autorización de Dirección.', ruta: '/cotizaciones' },
+  { clave: 'avance_obra', label: 'Avance de obra', descripcion: 'Avances físicos que superan lo contratado, pendientes de autorización de Superintendencia/Dirección.', ruta: '/avance-obra' },
   { clave: 'cancelacion', label: 'Cancelaciones', descripcion: 'Avisos informativos de requisiciones canceladas.', ruta: '/requisiciones' },
   { clave: 'incidencia', label: 'Incidencias', descripcion: 'Faltas, permisos, vacaciones e incapacidades pendientes de autorización.', ruta: '/incidencias' },
 ];

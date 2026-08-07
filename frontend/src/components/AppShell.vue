@@ -83,6 +83,8 @@ const grupos = [
       { to: '/proveedores', label: 'Proveedores' },
       { to: '/ordenes-compra', label: 'Órdenes de compra' },
       { to: '/importar-insumos', label: 'Importar Insumos' },
+      { to: '/importar-presupuesto-general', label: 'Importar Presupuesto General' },
+      { to: '/avance-obra', label: 'Avance de Obra' },
       { to: '/reportes', label: 'Reportes' },
     ],
   },

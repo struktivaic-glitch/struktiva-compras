@@ -121,23 +121,52 @@ export async function leerHojaComoMatriz(buffer, filtroNombreHoja = '') {
   const hojaDoc = parserXml.parse(hojaXml);
   const filasXml = hojaDoc.worksheet?.sheetData?.row ?? [];
 
+  function valorDeCelda(c) {
+    const tipo = c['@_t'];
+    // <c t="inlineStr"><is><t>texto</t></is></c> — el texto vive en <is>, no en <v> (a
+    // diferencia de shared strings/numéricos). Algunas herramientas (ej. openpyxl) escriben así
+    // por default en vez de usar sharedStrings.xml.
+    if (tipo === 'inlineStr') {
+      return c.is ? textoDeSharedString(c.is) : null;
+    }
+    const valorCrudo = c.v;
+    if (valorCrudo === undefined || valorCrudo === null) return null;
+    if (tipo === 's') {
+      const idx = Number(typeof valorCrudo === 'object' ? valorCrudo['#text'] : valorCrudo);
+      return sharedStrings[idx] ?? null;
+    }
+    if (tipo === 'str') {
+      return typeof valorCrudo === 'object' ? valorCrudo['#text'] : String(valorCrudo);
+    }
+    // Numérico (incluye fechas seriales, que no necesitamos convertir para este importador).
+    const num = Number(typeof valorCrudo === 'object' ? valorCrudo['#text'] : valorCrudo);
+    return Number.isNaN(num) ? null : num;
+  }
+
+  // Índice de columna 0-based a partir de la referencia de celda ("B7" -> 1). Excel/las
+  // herramientas que generan .xlsx (ej. openpyxl) omiten el <c> de celdas vacías por completo —
+  // sin esto, una fila con huecos (ej. solo la columna B con texto) se recorre por posición y
+  // todo queda desalineado una o más columnas a la izquierda.
+  function columnaAIndice(ref) {
+    const letras = String(ref ?? '').match(/^[A-Z]+/)?.[0] ?? '';
+    let idx = 0;
+    for (const ch of letras) idx = idx * 26 + (ch.charCodeAt(0) - 64);
+    return idx - 1;
+  }
+
   const matriz = filasXml.map((filaXml) => {
     const celdasXml = filaXml.c ?? [];
-    return celdasXml.map((c) => {
-      const tipo = c['@_t'];
-      const valorCrudo = c.v;
-      if (valorCrudo === undefined || valorCrudo === null) return null;
-      if (tipo === 's') {
-        const idx = Number(typeof valorCrudo === 'object' ? valorCrudo['#text'] : valorCrudo);
-        return sharedStrings[idx] ?? null;
-      }
-      if (tipo === 'str' || tipo === 'inlineStr') {
-        return typeof valorCrudo === 'object' ? valorCrudo['#text'] : String(valorCrudo);
-      }
-      // Numérico (incluye fechas seriales, que no necesitamos convertir para este importador).
-      const num = Number(typeof valorCrudo === 'object' ? valorCrudo['#text'] : valorCrudo);
-      return Number.isNaN(num) ? null : num;
-    });
+    const fila = [];
+    let siguiente = 0;
+    for (const c of celdasXml) {
+      const ref = c['@_r'];
+      const idx = ref ? columnaAIndice(ref) : siguiente;
+      const destino = idx >= 0 ? idx : siguiente;
+      while (fila.length < destino) fila.push(null);
+      fila[destino] = valorDeCelda(c);
+      siguiente = destino + 1;
+    }
+    return fila;
   });
 
   return matriz;

@@ -17,6 +17,8 @@ import pagosRoutes from './modules/pagos/routes.js';
 import expedienteRoutes from './modules/expediente/routes.js';
 import reportesRoutes from './modules/reportes/routes.js';
 import explosionInsumosRoutes from './modules/importaciones/explosionInsumos.js';
+import presupuestoGeneralRoutes from './modules/importaciones/presupuestoGeneral.js';
+import avanceObraRoutes from './modules/avanceObra/routes.js';
 import usuariosRoutes from './modules/usuarios/routes.js';
 import firmasRoutes from './modules/firmas/routes.js';
 import notificacionesRoutes from './modules/notificaciones/routes.js';
@@ -59,6 +61,8 @@ export async function buildApp() {
   await app.register(expedienteRoutes);
   await app.register(reportesRoutes);
   await app.register(explosionInsumosRoutes);
+  await app.register(presupuestoGeneralRoutes);
+  await app.register(avanceObraRoutes);
   await app.register(usuariosRoutes);
   await app.register(firmasRoutes);
   await app.register(notificacionesRoutes);

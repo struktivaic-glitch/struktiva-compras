@@ -38,8 +38,11 @@ const routes = [
   { path: '/reportes/estado-cuenta', name: 'reporte-estado-cuenta', component: () => import('../views/reportes/ReporteEstadoCuentaView.vue'), meta: { requiresAuth: true } },
   { path: '/reportes/explosion-vs-real', name: 'reporte-explosion-real', component: () => import('../views/reportes/ReporteExplosionVsRealView.vue'), meta: { requiresAuth: true } },
   { path: '/reportes/variacion-precios', name: 'reporte-variacion-precios', component: () => import('../views/reportes/ReporteVariacionPreciosView.vue'), meta: { requiresAuth: true } },
+  { path: '/reportes/avance-financiero', name: 'reporte-avance-financiero', component: () => import('../views/reportes/ReporteAvanceFinancieroView.vue'), meta: { requiresAuth: true } },
   { path: '/perfil', name: 'perfil', component: () => import('../views/PerfilView.vue'), meta: { requiresAuth: true } },
   { path: '/importar-insumos', name: 'importar-insumos', component: () => import('../views/ImportarInsumosView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },
+  { path: '/importar-presupuesto-general', name: 'importar-presupuesto-general', component: () => import('../views/ImportarPresupuestoGeneralView.vue'), meta: { requiresAuth: true, roles: ['comprador', 'direccion'] } },
+  { path: '/avance-obra', name: 'avance-obra', component: () => import('../views/AvanceObraView.vue'), meta: { requiresAuth: true } },
   { path: '/usuarios', name: 'usuarios', component: () => import('../views/UsuariosView.vue'), meta: { requiresAuth: true, roles: ['direccion', 'auditor'] } },
   { path: '/notificaciones', name: 'notificaciones', component: () => import('../views/NotificacionesView.vue'), meta: { requiresAuth: true } },
 ];

@@ -501,3 +501,43 @@ cambio de estructura de base de datos.
     Superintendente completa correctamente, y los candados de rol — 403 para roles sin permiso,
     409 al intentar firmar dos veces) — datos de prueba eliminados después, dejando intactos
     tanto los datos reales del usuario como una cotización previa ajena a esta prueba.
+- **Bloque 29** (06-07/08/2026): Avance financiero de obra — primer módulo de una lista de 4 que
+  el usuario planteó para el futuro (Destajos, Avance financiero, Maquinaria/Equipos, Seguridad e
+  Higiene), acordado empezar por este porque los Destajos (próximo bloque) dependen de él. Es un
+  presupuesto **distinto** al ya existente por insumo (`presupuesto_obra_insumo`, control de
+  gasto ascendente): este es el catálogo de conceptos **contratados con el cliente**
+  (Capítulo/Clave/Concepto/Unidad/Cantidad/P.U., típico de un presupuesto de obra formal),
+  importable por Excel igual que la Explosión de Insumos. El avance se mide por volumen y monto
+  ejecutado (no por generadores formales, decisión explícita del usuario por practicidad) y — a
+  petición del usuario — si un avance hace que el acumulado supere lo contratado, requiere
+  justificación y autorización de Superintendencia/Dirección antes de contar en el avance
+  oficial, mismo espíritu que el candado de excedente ya usado en Requisiciones/Bloque 16.
+  - Migración 022: `conceptos_obra`, `concepto_avance` (con `estatus`
+    confirmado/pendiente_autorizacion), y nueva categoría `avance_obra` en notificaciones.
+  - Backend: catálogo de conceptos (alta manual + importador `analizar`/`confirmar`, mismo patrón
+    que Explosión de Insumos), captura de avance (bloquea con 422 si excede y falta
+    justificación), autorización con firma (`POST /avance/:id/autorizar`, solo Superintendencia/
+    Dirección), y `GET /api/reportes/avance-financiero` (valor contratado vs. ejecutado).
+  - Frontend: `Avance de Obra` (tabla por concepto con barra de % avance, modal de captura que
+    avisa en vivo si el número que estás tecleando va a exceder lo contratado y pide
+    justificación, sección de pendientes con botón Autorizar solo para quien puede), `Importar
+    Presupuesto General`, y el reporte imprimible `Avance Financiero` dentro del hub de Reportes.
+  - **Dos bugs reales encontrados y corregidos en el lector de Excel compartido** (`xlsxReader.js`,
+    usado también por el importador de Explosión de Insumos — se hizo una prueba de regresión
+    para confirmar que ese importador siguió funcionando igual después del fix):
+    1. No manejaba el formato `inlineStr` (`<c t="inlineStr"><is><t>texto</t></is></c>`), que
+       usan algunas herramientas (ej. openpyxl) en vez de `sharedStrings.xml` — el texto vive en
+       `<is>`, no en `<v>`, así que toda celda de texto llegaba como `null`.
+    2. Las celdas se recorrían por posición en vez de por su referencia real (`r="B7"`) — una
+       fila con huecos (columnas vacías que Excel simplemente no escribe) quedaba con todo
+       recorrido una o más columnas a la izquierda. Se corrigió calculando el índice de columna
+       real a partir de la referencia de celda.
+  - Otro bug corregido durante pruebas: `SELECT ... GROUP BY ... FOR UPDATE` truena en Postgres
+    ("FOR UPDATE is not allowed with GROUP BY") — se separó en dos consultas (lock de la fila +
+    cálculo del acumulado aparte).
+  - Probado de punta a punta contra Neon: avance dentro de lo contratado (directo), avance que
+    excede sin justificación (bloqueado, 422), con justificación (queda pendiente, no cuenta
+    todavía, notifica a Superintendencia/Dirección), autorización con firma (403 para quien no
+    puede, éxito para Superintendente, ahora sí cuenta en el acumulado), importación real de un
+    .xlsx con capítulos/conceptos, y el reporte de avance financiero — datos de prueba eliminados
+    después.

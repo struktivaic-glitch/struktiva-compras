@@ -23,5 +23,6 @@ const reportes = [
   { to: '/reportes/estado-cuenta', titulo: 'Estado de cuenta por proveedor', descripcion: 'Facturas, pagos aplicados y saldo por proveedor.' },
   { to: '/reportes/explosion-vs-real', titulo: 'Explosión vs. Real', descripcion: 'Presupuestado vs. Requerido, Comprado, Recibido y Facturado por insumo.' },
   { to: '/reportes/variacion-precios', titulo: 'Variación de precios', descripcion: 'Costo base de presupuesto vs. costo real negociado por insumo.' },
+  { to: '/reportes/avance-financiero', titulo: 'Avance Financiero', descripcion: 'Valor de obra ejecutada vs. presupuesto general contratado, por concepto.' },
 ];
 </script>

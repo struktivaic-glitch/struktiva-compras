@@ -58,6 +58,28 @@ export default async function reportesRoutes(app) {
     return rows;
   });
 
+  // Bloque 29: avance financiero de obra ejecutada vs. presupuesto general contratado.
+  app.get('/api/reportes/avance-financiero', async (request, reply) => {
+    const { obraId } = request.query;
+    if (!obraId) return reply.code(400).send({ error: 'obraId es obligatorio' });
+
+    const { rows } = await pool.query(
+      `SELECT c.id, c.capitulo, c.clave, c.descripcion, c.unidad, c.cantidad_contratada, c.precio_unitario,
+              c.cantidad_contratada * c.precio_unitario AS importe_contratado,
+              COALESCE(SUM(ca.cantidad_ejecutada) FILTER (WHERE ca.estatus = 'confirmado'), 0) AS cantidad_ejecutada
+       FROM conceptos_obra c
+       LEFT JOIN concepto_avance ca ON ca.concepto_id = c.id
+       WHERE c.obra_id = $1
+       GROUP BY c.id
+       ORDER BY c.capitulo NULLS LAST, c.clave`,
+      [obraId]
+    );
+    return rows.map((r) => ({
+      ...r,
+      importe_ejecutado: Number(r.cantidad_ejecutada) * Number(r.precio_unitario),
+    }));
+  });
+
   app.get('/api/reportes/variacion-precios', async (request, reply) => {
     const { obraId } = request.query;
     if (!obraId) return reply.code(400).send({ error: 'obraId es obligatorio' });
