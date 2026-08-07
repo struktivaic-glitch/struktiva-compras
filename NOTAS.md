@@ -71,6 +71,84 @@ cambio de estructura de base de datos.
   costo unitario original? Esto afecta directamente el reporte de "Inventario actual" y el de
   "Explosión vs. Real" de ambas obras. Retomar antes de dar por cerrado el módulo de Almacén.
 
+- **Fotos en Entrada de Almacén (remisión + embarque).** Pedido del usuario (07/08/2026). Hoy
+  `entradas_almacen` no guarda ninguna imagen — solo el número de remisión como texto
+  (`remision_proveedor VARCHAR`). Es viable y encaja con un patrón que ya existe en el sistema:
+  BYTEA en Postgres para archivos pequeños, igual que `documentos_personal`/`documentos_equipo`
+  y las fotos de perfil (`AvatarUsuario`). Falta decidir: ¿1 foto de cada tipo o varias por
+  entrada (a veces la remisión trae 2-3 hojas, o el embarque llega repartido en varios
+  camiones)? Recomiendo permitir varias de cada tipo desde el inicio (una tabla
+  `fotos_entrada_almacen(entrada_id, tipo['remision','embarque'], imagen BYTEA, ...)`) en vez
+  de una columna única — así no hay que migrar de nuevo cuando alguien suba la segunda. En
+  móvil, usar `capture="environment"` (cámara trasera) en el `<input type="file">`, igual que ya
+  se usa `capture="user"` (cámara frontal) para selfies de asistencia.
+
+- **Fotos en Salida de Almacén (personal + material entregado).** Mismo pedido, mismo patrón que
+  el punto anterior — aplica igual a `salidas_almacen`. Aquí hay un matiz: "foto del personal"
+  ¿es para identificar a quién se le entregó (ya existe `usuario_recibe_nombre` como texto
+  libre, sin verificación) o es evidencia tipo "foto de la persona en el momento de la entrega"
+  (como ya se hace con el selfie opcional de Asistencia)? Conviene resolverlo igual que
+  Asistencia — foto de evidencia, no biometría — para no reabrir el tema de datos biométricos
+  que ya se descartó ahí. Misma estructura de tabla que en Entrada (`tipo['personal',
+  'material']`).
+
+- **Ligar la factura con la Entrada de Almacén (no solo con la OC).** Repasé el esquema: hoy
+  `facturas.oc_id` referencia directo a la Orden de Compra, y `entradas_almacen.oc_id` también
+  — pero **factura y entrada no se referencian entre sí**, solo comparten la misma OC como punto
+  en común indirecto. Esto ya genera un hueco real: una OC puede tener varias entradas
+  (recepción parcial) y, en teoría, varias facturas (facturación parcial del proveedor); hoy no
+  hay forma de saber en el sistema "esta factura corresponde a cuál entrada específica" — el
+  three-way matching actual (Bloque 7) compara factura vs. OC, no factura vs. lo realmente
+  recibido en cada remisión. Dos caminos, con mi recomendación:
+  1. **Selector en la pantalla de captura de factura** ("Entrada relacionada", un `<select>` con
+     las entradas de esa OC que aún no tienen factura ligada) — **más simple, no toca el modelo
+     de three-way matching existente**, solo agrega `factura_detalle.entrada_id` opcional o una
+     tabla puente `factura_entrada`.
+  2. Registrar la factura *desde* la pantalla de la Entrada (como una acción "Facturar esta
+     entrada") — más natural para el flujo de captura en campo, pero requiere mover/duplicar
+     lógica que hoy vive en el módulo de Facturas.
+  Recomiendo la opción 1: cambio acotado, no reescribe el matching actual, y dado que puede
+  haber facturas que no vengan ligadas 1-a-1 con una sola entrada (ej. una factura que cubre dos
+  remisiones), conviene que la relación sea muchos-a-muchos desde el principio
+  (`factura_entrada(factura_id, entrada_id)`) en vez de una columna única en `facturas`.
+
+- **Checklist de módulos visibles por usuario (permisos granulares).** Pedido del usuario
+  (07/08/2026). Este es el de mayor alcance de los cinco — vale la pena que quede claro antes de
+  construirlo. Hoy el sistema **no tiene permisos por usuario**: tiene 6 roles fijos
+  (`residente`, `superintendente`, `comprador`, `almacenista`, `direccion`, `auditor`) definidos
+  en la tabla `roles`, y cada módulo decide a mano, en su propio código (backend y frontend, más
+  de 15 archivos distintos con arreglos `ROLES_GESTION`/`ROLES_AUTORIZA`), qué roles pueden
+  entrar. No existe ningún concepto de "el usuario X, que es Superintendente, pero sin acceso a
+  Destajos" — todos los Superintendentes ven exactamente lo mismo. Implementar un checklist real
+  de módulos por usuario significa decidir primero:
+  - ¿Los permisos son **por usuario individual** (cada quien su propia lista, como pediste) o
+    seguimos con roles pero editables (Dirección redefine qué puede ver cada rol, y todos los
+    usuarios de ese rol heredan el cambio)? Lo primero es más flexible pero significa dar de
+    alta permisos uno por uno cada vez que entra alguien nuevo; lo segundo es menos trabajo de
+    mantenimiento pero no permite la excepción individual que describes.
+  - Si es por usuario individual, sigue haciendo falta un rol base (para separar "quién puede
+    autorizar/firmar" de "qué pantallas ve") — el checklist resolvería la *visibilidad* de
+    módulos, no reemplazaría por sí solo los candados de autorización (firma de Dirección,
+    montos de OC, etc.) que hoy dependen del rol.
+  - Habría que migrar las ~15+ verificaciones de rol hardcodeadas (`ROLES_GESTION.includes(rol)`)
+    a una tabla de permisos (`usuario_modulo(usuario_id, modulo_clave, puede_ver)`) y un
+    middleware/composable centralizado que las consulte — es un cambio transversal, no un
+    módulo nuevo aislado como los últimos cuatro que construimos, así que conviene planearlo
+    como su propio bloque de trabajo, no colarlo dentro de otro.
+  Sugiero platicarlo con calma antes de empezar (por eso lo dejo aquí anotado, no lo arranco de
+  una vez como los otros cuatro).
+
+- **Formas de pago fijas (catálogo cerrado).** Pedido del usuario (07/08/2026): efectivo,
+  transferencia, tarjeta de débito, tarjeta de crédito. Revisé el código: hoy
+  `pagos_proveedor.forma_pago` es texto libre (`VARCHAR(40)`, sin `CHECK`) y en
+  `PagoNuevoView.vue` es un `<input>` de texto con placeholder "Transferencia, cheque…" — cada
+  quien lo escribe como quiere, sin estandarizar. Es el más sencillo de los cinco: cambiar el
+  campo a un `<select>` con las 4 opciones fijas, y agregar el `CHECK` correspondiente en la
+  columna (con una migración chica para normalizar los valores que ya existan capturados como
+  texto libre, si los hay). Un detalle a confirmar contigo: ¿esta lista de 4 aplica solo a Pagos
+  a Proveedor, o también quieres el mismo candado en Pagos a Personal (`pagos_personal`), que
+  hoy ni siquiera tiene un campo de forma de pago?
+
 ## Bitácora de bloques
 
 - **Bloque 12** (03/08/2026): rediseño del control de presupuesto — de Partida a Obra completa,
