@@ -627,3 +627,12 @@ cambio de estructura de base de datos.
     reemplazo verificado uno-a-uno por archivo antes de aplicar (una sola ocurrencia por archivo).
   - Verificado en el navegador con medición directa del DOM: botones y selector a 39px exactos,
     título de sección a 36px, sin romper ningún layout.
+  - Tercera vuelta: el usuario pidió que **todo botón del sistema** mida 30px de alto y 13px de
+    texto, dejando la franja de título (header: logo, STRUKTIVA, campanita, foto) tal cual. Dado
+    que hay decenas de botones con combinaciones de clases distintas en todo el proyecto, en vez
+    de tocar cada vista se agregó una sola regla global en `style.css`
+    (`button:not(header button) { min-height:30px; font-size:13px; padding-top/bottom:0; }` con
+    `!important` para ganarle a las clases de Tailwind ya puestas en cada botón) — los botones
+    dentro de `<header>` (campanita y "Salir") quedan excluidos automáticamente por el selector.
+    Verificado en el navegador: campanita/avatar siguen en 54px y STRUKTIVA en 34px (sin tocar),
+    botones normales y de modales a exactamente 30px/13px en varias pantallas distintas.

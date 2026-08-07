@@ -23,6 +23,18 @@ body {
   display: none;
 }
 
+/* Ajuste global de botones (pedido explícito): toda <button> del sistema queda en 30px de alto
+   mínimo y 13px de texto, salvo dentro de la franja de título (header: logo, STRUKTIVA, campanita
+   y foto de usuario), que se deja tal cual. Se centraliza aquí en vez de tocar cada vista porque
+   hay decenas de botones con combinaciones de clases distintas (min-h de 38 a 48px, texto de
+   text-xs a text-sm) — una sola regla global es más confiable que reemplazar cada una a mano. */
+button:not(header button) {
+  min-height: 30px !important;
+  font-size: 13px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
 @media print {
   .no-print {
     display: none !important;
