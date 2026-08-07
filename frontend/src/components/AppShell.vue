@@ -69,6 +69,7 @@ import AvatarUsuario from './AvatarUsuario.vue';
 import BrandMark from './BrandMark.vue';
 import NotificacionesBell from './NotificacionesBell.vue';
 import { useAuthStore } from '../stores/auth.js';
+import { GRUPOS_NAV } from '../lib/modulosNav.js';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -76,55 +77,30 @@ const route = useRoute();
 const grupoAbierto = ref(null);
 const navRef = ref(null);
 
-const grupos = [
-  {
-    clave: 'insumos', label: 'Insumos', icono: '📥',
-    items: [
-      { to: '/', label: 'Dashboard' },
-      { to: '/requisiciones', label: 'Requisiciones' },
-      { to: '/cotizaciones', label: 'Cotizaciones' },
-      { to: '/proveedores', label: 'Proveedores' },
-      { to: '/ordenes-compra', label: 'Órdenes de compra' },
-      { to: '/importar-insumos', label: 'Importar Insumos' },
-      { to: '/reportes', label: 'Reportes' },
-      { to: '/destajos', label: 'Destajos' },
-    ],
-  },
-  {
-    clave: 'obras', label: 'Obras', icono: '🏗️',
-    items: [
-      { to: '/importar-presupuesto-general', label: 'Importar Presupuesto' },
-      { to: '/avance-obra', label: 'Avance de Obra' },
-      { to: '/reportes/avance-financiero', label: 'Dash de Avance de Obra' },
-    ],
-  },
-  {
-    clave: 'almacen', label: 'Almacén', icono: '🏬',
-    items: [
-      { to: '/almacen/entradas', label: 'Entradas' },
-      { to: '/almacen/salidas', label: 'Salidas' },
-      { to: '/almacen/inventario', label: 'Inventario' },
-      { to: '/facturas', label: 'Facturas' },
-      { to: '/pagos', label: 'Pagos' },
-      { to: '/equipos', label: 'Maquinaria y Equipos' },
-    ],
-  },
-  {
-    clave: 'rh', label: 'R.H.', icono: '👥',
-    items: [
-      { to: '/trabajadores', label: 'Personal' },
-      { to: '/asistencia', label: 'Asistencia' },
-      { to: '/incidencias', label: 'Incidencias' },
-      { to: '/pagos-personal', label: 'Pagos a Personal' },
-      { to: '/destajistas', label: 'Destajistas' },
-      { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },
-    ],
-  },
-];
-
-const gruposVisibles = computed(() =>
-  grupos.map((g) => ({ ...g, items: g.items.filter((item) => !item.roles || item.roles.includes(auth.rol)) }))
+// "Usuarios" vive fuera de la lista canónica (modulosNav.js) a propósito — no forma parte del
+// checklist de permisos por usuario (migración 029), sigue gobernado solo por rol, para no
+// arriesgar que alguien se quite a sí mismo el acceso a la pantalla que arregla los permisos. Se
+// agrega aquí, en el grupo R.H., como el único ítem que todavía usa el filtro viejo por `roles`.
+const grupos = GRUPOS_NAV.map((g) =>
+  g.clave === 'rh' ? { ...g, items: [...g.items, { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] }] } : g
 );
+
+// Un ítem se ve si: (a) tiene `roles` y el rol del usuario está en la lista (caso especial de
+// Usuarios, arriba), o (b) no tiene `roles` — en ese caso se ve solo si el usuario tiene ese
+// módulo en su checklist de permisos (migración 029). `auth.usuario.modulos` viaja en el login;
+// si por lo que sea no viene (usuarios con sesión de antes de este cambio), se trata como "ver
+// todo" para no dejar a nadie fuera de golpe hasta que vuelva a iniciar sesión.
+const gruposVisibles = computed(() => {
+  const modulos = auth.usuario?.modulos;
+  return grupos.map((g) => ({
+    ...g,
+    items: g.items.filter((item) => {
+      if (item.roles) return item.roles.includes(auth.rol);
+      if (!modulos) return true;
+      return modulos.includes(item.to);
+    }),
+  }));
+});
 const itemsDelGrupoAbierto = computed(() => gruposVisibles.value.find((g) => g.clave === grupoAbierto.value)?.items ?? []);
 
 function rutaPerteneceA(to) {

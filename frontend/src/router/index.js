@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
+import { MODULOS_FLAT } from '../lib/modulosNav.js';
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
@@ -56,12 +57,30 @@ const router = createRouter({
   routes,
 });
 
+// Checklist de módulos por usuario (migración 029): ¿esta ruta cae dentro de un módulo del menú
+// que el usuario NO tiene permitido? Si la ruta ni siquiera corresponde a un módulo del menú
+// (ej. /perfil, /notificaciones, /expediente/:id, /login) no se gatea aquí — son pantallas de
+// utilidad/soporte alcanzables por enlace, no ítems del menú. "/usuarios" tampoco se gatea aquí
+// a propósito, sigue solo por rol (ver modulosNav.js).
+function moduloBloqueado(path, modulos) {
+  if (!modulos || path === '/usuarios' || path.startsWith('/usuarios/')) return false;
+  // Puede haber más de un módulo del menú "cubriendo" la misma ruta (ej. '/reportes' y
+  // '/reportes/avance-financiero' ambos son prefijo de '/reportes/avance-financiero') — basta con
+  // tener permiso en CUALQUIERA de los que apliquen (el genérico cubre al específico, y viceversa).
+  const candidatos = MODULOS_FLAT.filter((m) => path === m.to || path.startsWith(`${m.to}/`));
+  if (candidatos.length === 0) return false; // no corresponde a ningún ítem del menú, no se gatea
+  return !candidatos.some((m) => modulos.includes(m.to));
+}
+
 router.beforeEach((to) => {
   const auth = useAuthStore();
   if (to.meta.requiresAuth && !auth.autenticado) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
   if (to.meta.roles && !to.meta.roles.includes(auth.rol)) {
+    return { name: 'dashboard' };
+  }
+  if (moduloBloqueado(to.path, auth.usuario?.modulos)) {
     return { name: 'dashboard' };
   }
   if (to.name === 'login' && auth.autenticado) {

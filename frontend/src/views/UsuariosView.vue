@@ -57,9 +57,11 @@
                   {{ u.activo ? 'Activo' : 'Inactivo' }}
                 </span>
               </td>
-              <td v-if="puedeEditar" class="px-4 py-2.5 font-sans space-x-2">
+              <td v-if="puedeEditar" class="px-4 py-2.5 font-sans space-x-2 whitespace-nowrap">
                 <button class="text-xs font-semibold text-primary underline" @click="empezarEdicion(u)">Editar</button>
+                <button class="text-xs font-semibold text-primary underline" @click="abrirPermisos(u)">Permisos</button>
                 <button class="text-xs font-semibold text-warning underline" @click="restablecer(u)">Restablecer contraseña</button>
+                <button class="text-xs font-semibold text-danger underline" @click="eliminar(u)">Eliminar</button>
               </td>
             </tr>
             <tr v-else class="border-t border-slate-200 bg-slate-50">
@@ -87,6 +89,38 @@
         </tbody>
       </table>
     </div>
+
+    <div v-if="permisosUsuario" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="permisosUsuario = null">
+      <div class="bg-white rounded-xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto">
+        <h3 class="text-sm font-display mb-1">Módulos visibles — {{ permisosUsuario.nombre }}</h3>
+        <p class="text-xs text-slate-500 mb-4">
+          Qué pantallas puede ver en el menú y al navegar. No afecta quién puede autorizar/editar
+          en cada módulo — eso lo sigue definiendo el rol.
+        </p>
+
+        <div class="flex justify-end gap-2 mb-3 text-[11px]">
+          <button class="font-semibold text-primary underline" @click="marcarTodos(true)">Marcar todos</button>
+          <button class="font-semibold text-primary underline" @click="marcarTodos(false)">Quitar todos</button>
+        </div>
+
+        <div v-for="g in GRUPOS_NAV" :key="g.clave" class="mb-4 last:mb-0">
+          <div class="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">{{ g.icono }} {{ g.label }}</div>
+          <label v-for="item in g.items" :key="item.to" class="flex items-center gap-2 text-sm py-1">
+            <input type="checkbox" :value="item.to" v-model="modulosSeleccionados" class="w-4 h-4" />
+            {{ item.label }}
+          </label>
+        </div>
+
+        <p v-if="errorPermisos" class="bg-red-50 border border-danger/30 text-danger text-xs rounded-lg px-3 py-2 mt-2 mb-2">{{ errorPermisos }}</p>
+
+        <div class="flex gap-2 justify-end mt-4">
+          <button class="min-h-[42px] border border-slate-300 text-slate-600 font-bold rounded-lg px-4 text-sm" @click="permisosUsuario = null">Cancelar</button>
+          <button class="min-h-[42px] bg-primary text-white font-bold rounded-lg px-4 text-sm disabled:opacity-50" :disabled="guardandoPermisos" @click="guardarPermisos">
+            {{ guardandoPermisos ? 'Guardando…' : 'Guardar permisos' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </AppShell>
 </template>
 
@@ -95,6 +129,7 @@ import { onMounted, reactive, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import AvatarUsuario from '../components/AvatarUsuario.vue';
 import { api } from '../lib/api.js';
+import { GRUPOS_NAV } from '../lib/modulosNav.js';
 import { useAuthStore } from '../stores/auth.js';
 
 const auth = useAuthStore();
@@ -157,6 +192,50 @@ async function restablecer(u) {
     mensaje.value = `Contraseña de ${u.nombre} restablecida. Compártesela por un canal seguro.`;
   } catch (err) {
     error.value = err.response?.data?.error || 'No se pudo restablecer la contraseña.';
+  }
+}
+
+async function eliminar(u) {
+  if (!window.confirm(`¿Eliminar a "${u.nombre}" por completo? Solo es posible si nunca quedó registrado en ningún movimiento del sistema — si ya tiene actividad, desactívalo en su lugar desde "Editar".`)) return;
+  error.value = '';
+  mensaje.value = '';
+  try {
+    await api.delete(`/usuarios/${u.id}`);
+    mensaje.value = `${u.nombre} fue eliminado.`;
+    await cargar();
+  } catch (err) {
+    error.value = err.response?.data?.error || 'No se pudo eliminar el usuario.';
+  }
+}
+
+// --- Checklist de módulos visibles (migración 029) ---
+const permisosUsuario = ref(null);
+const modulosSeleccionados = ref([]);
+const guardandoPermisos = ref(false);
+const errorPermisos = ref('');
+
+async function abrirPermisos(u) {
+  permisosUsuario.value = u;
+  errorPermisos.value = '';
+  const { data } = await api.get(`/usuarios/${u.id}/modulos`);
+  modulosSeleccionados.value = data.modulos;
+}
+
+function marcarTodos(todos) {
+  modulosSeleccionados.value = todos ? GRUPOS_NAV.flatMap((g) => g.items.map((i) => i.to)) : [];
+}
+
+async function guardarPermisos() {
+  guardandoPermisos.value = true;
+  errorPermisos.value = '';
+  try {
+    await api.put(`/usuarios/${permisosUsuario.value.id}/modulos`, { modulos: modulosSeleccionados.value });
+    mensaje.value = `Permisos de ${permisosUsuario.value.nombre} actualizados. Se aplican la próxima vez que esa persona inicie sesión.`;
+    permisosUsuario.value = null;
+  } catch (err) {
+    errorPermisos.value = err.response?.data?.error || 'No se pudieron guardar los permisos.';
+  } finally {
+    guardandoPermisos.value = false;
   }
 }
 

@@ -27,6 +27,12 @@ export default async function authRoutes(app) {
       { expiresIn: env.jwtExpiresIn }
     );
 
+    // Checklist de módulos visibles (migración 029) — viaja en la respuesta de login (no en el
+    // JWT, para no tener que reemitir tokens cada vez que Dirección ajusta permisos) y el
+    // frontend lo guarda junto con el resto de `usuario`. Un cambio de permisos aplica hasta el
+    // siguiente inicio de sesión, igual que un cambio de rol.
+    const { rows: modulosRows } = await pool.query('SELECT modulo_clave FROM usuario_modulos WHERE usuario_id = $1', [usuario.id]);
+
     return {
       token,
       usuario: {
@@ -36,6 +42,7 @@ export default async function authRoutes(app) {
         rol: usuario.rol,
         rolNombre: usuario.rol_nombre,
         tieneFoto: usuario.tiene_foto,
+        modulos: modulosRows.map((r) => r.modulo_clave),
       },
     };
   });

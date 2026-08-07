@@ -863,3 +863,55 @@ cambio de estructura de base de datos.
     reciente del sistema, probablemente sea esto — cerrar y reabrir la pestaña (o, en el atajo
     instalado del celular, desinstalar/reinstalar si persiste) lo resuelve; no requiere ninguna
     acción de nuestro lado.
+
+- **Bloque 34** (07/08/2026): checklist de módulos visibles por usuario (el pendiente que se
+  dejó anotado en el Bloque 33 para platicar el esquema) + eliminar usuarios. Migración 029.
+  - **Alcance decidido** (importante tenerlo claro): el checklist controla **qué pantallas ve**
+    cada usuario — en el menú y al navegar directo a una URL. **No** afloja ni reemplaza los
+    candados de autorización que ya existían por rol (firmas, montos de OC, quién puede crear/
+    editar en cada módulo) — esos siguen exactamente igual, atados al rol como siempre. Es una
+    capa nueva e independiente encima de lo que ya había. La enforcement es del lado del
+    navegador (menú + guard de rutas), no en cada endpoint del API — coherente con que hoy casi
+    todos los `GET` del backend ya eran de lectura abierta a cualquier usuario autenticado sin
+    importar su rol (la app nunca tuvo, hasta hoy, diferenciación de *qué se puede ver* — solo de
+    *qué se puede modificar*), así que esto no baja el nivel de seguridad que ya había, solo
+    agrega una capa de visibilidad encima.
+  - `usuario_modulos(usuario_id, modulo_clave)` — la clave del módulo es la misma ruta del menú
+    (`/requisiciones`, `/almacen/entradas`, etc.), no se inventó un catálogo de claves aparte
+    para no tener dos listas que se puedan desincronizar. Todos los usuarios existentes arrancan
+    con acceso a todo (mismo comportamiento de siempre) — Dirección ajusta desde ahí en adelante.
+  - **"Usuarios" queda fuera del checklist a propósito** — sigue gobernado solo por rol
+    (direccion/auditor), para no arriesgar que alguien se quite a sí mismo (o al único
+    administrador) el acceso a la pantalla que arregla los permisos.
+  - Nuevo `frontend/src/lib/modulosNav.js` — extrae la lista de grupos/ítems del menú que antes
+    vivía hardcodeada dentro de `AppShell.vue`, para que el mismo `AppShell.vue` (pinta el menú)
+    y `UsuariosView.vue` (checklist de permisos) usen la misma fuente. El router
+    (`router/index.js`) también la usa para el guard de navegación directa por URL — si la ruta
+    cae dentro de un módulo del menú y el usuario no lo tiene permitido, redirige a Dashboard; si
+    la ruta no corresponde a ningún ítem del menú (`/perfil`, `/notificaciones`,
+    `/expediente/:id`), no se gatea, son pantallas de apoyo alcanzables por enlace.
+  - Login (`/api/auth/login`) ahora devuelve `usuario.modulos` — viaja en la respuesta, no en el
+    JWT, así que un cambio de permisos aplica hasta el siguiente inicio de sesión (igual que un
+    cambio de rol hoy). Si por lo que sea `modulos` no viene (sesión vieja antes de este cambio),
+    se trata como "ver todo" para no dejar a nadie fuera de golpe.
+  - **Eliminar usuario** (`DELETE /api/usuarios/:id`, distinto de desactivar): borrado real, pero
+    solo se completa si el usuario nunca quedó referenciado en ningún registro de negocio
+    (requisiciones, firmas, entradas, facturas, ni siquiera su propia bitácora de auditoría) — se
+    apoya en las llaves foráneas que ya existían en cada tabla (no se duplicó esa lógica a mano):
+    si Postgres rechaza el `DELETE` por eso, se traduce a un mensaje claro sugiriendo desactivar
+    en su lugar, en vez de un error crudo. Nunca se puede eliminar la propia cuenta.
+  - Probado de punta a punta contra Neon, con dos usuarios de prueba creados directo por SQL
+    (uno rol Dirección para administrar, otro rol Residente para probar el lado de "quién ve")
+    — nunca se tocó ninguna cuenta real del equipo: login con `modulos` en la respuesta,
+    checklist guardando y reflejándose (quitar "Facturas"/"Pagos" a un usuario y confirmar que
+    desaparecen del menú y que `/facturas` redirige a Dashboard al navegar directo), alta de
+    usuario nueva con los 22 módulos por default, eliminar bloqueado con mensaje claro sobre un
+    usuario real con actividad (sin borrarlo), eliminar exitoso sobre un usuario sin actividad, y
+    candado de "no puedes eliminarte a ti mismo" — datos de prueba (2 usuarios + su bitácora)
+    eliminados por completo después, sin dejar rastro.
+  - **Detectado de paso, no relacionado con este cambio**: la cuenta demo `direccion@struktiva.
+    com.mx` está desactivada en producción (reemplazada por la cuenta real de Dirección) y el
+    correo de "Fernando" (Superintendente) ya no es el demo `superintendente@struktiva.com.mx` —
+    el equipo ya empezó a usar cuentas reales en el sistema en vivo. Bien — solo lo anoto porque
+    cambia cuáles credenciales demo siguen sirviendo para pruebas futuras en este documento (ver
+    sección "Usuarios demo" al inicio, que puede estar quedándose desactualizada).
