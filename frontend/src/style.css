@@ -45,16 +45,32 @@ a.min-h-\[30px\] {
    en 30px de alto mínimo y 13px de texto, salvo dentro del header. Se excluyen checkbox/radio/
    file porque son controles nativos del navegador, no "celdas de rellenar datos". Los textarea
    solo reciben el tamaño de texto — son multilínea, quitarles el padding vertical se ve mal con
-   varios renglones. */
+   varios renglones.
+   Fondo y color EXPLÍCITOS (no solo tamaño): a diferencia de un <button> o un <div>, un <select>
+   o <input> normal no trae una clase bg-white — su fondo blanco es el que dibuja el navegador
+   por defecto para controles de formulario, no algo que la regla de contraste (basada en
+   detectar clases .bg-white/.bg-slate-50, etc.) pueda ver. Resultado: cualquier select/input
+   suelto sobre el azul de halo (fuera de una tarjeta clara) se quedaba con fondo blanco nativo
+   pero heredando el texto blanco de `main`, invisible — el mismo bug de los botones tipo
+   pestaña, pero en TODOS los campos de formulario sueltos del sistema (ej. el selector de obra
+   del Dashboard). Como en este proyecto absolutamente todo select/input/textarea está pensado
+   para verse como una celda clara con texto oscuro (no hay ninguno con fondo oscuro intencional
+   en ninguna vista), se fuerza el fondo y el color aquí mismo — así no importa si el campo queda
+   suelto sobre el azul o dentro de una tarjeta, siempre es autocontenido y nunca depende de un
+   ancestro para tener contraste. */
 input:not([type='checkbox']):not([type='radio']):not([type='file']):not(header input),
 select:not(header select) {
   min-height: 30px !important;
   font-size: 13px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  background-color: #fff !important;
+  color: #0f172a !important;
 }
 textarea:not(header textarea) {
   font-size: 13px !important;
+  background-color: #fff !important;
+  color: #0f172a !important;
 }
 
 /* Fondo general del sistema: azul de halo (#2563EB, pedido explícito del usuario — tono medio

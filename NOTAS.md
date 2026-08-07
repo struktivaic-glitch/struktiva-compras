@@ -702,3 +702,18 @@ cambio de estructura de base de datos.
     `false` en el selector (ya no se le aplica el blanco), y el párrafo suelto de `/reportes`
     se mantiene en `true` (sigue aclarándose correctamente) — ambos casos verificados sin
     regresión antes de desplegar.
+  - **Tercer bug, misma familia, encontrado por el usuario**: los `<select>` (y por extensión
+    cualquier `<input>`/`<textarea>`) sueltos sobre el azul (ej. el selector de obra del
+    Dashboard) tenían el mismo problema pero por una causa distinta — su fondo blanco NO viene de
+    una clase `.bg-white` de Tailwind, es el fondo nativo que dibuja el navegador para controles
+    de formulario, así que la regla de contraste (que detecta clases, no estilos nativos) no
+    podía verlo. Resultado: fondo blanco nativo + texto blanco heredado de `main` = invisible.
+    Se hizo un mapeo del proyecto completo (55 `<select>`, 126 `<input>` de texto/número/fecha,
+    8 vistas con `<textarea>`) — inviable auditar campo por campo cuál está "suelto" y cuál
+    dentro de una tarjeta, así que se optó por la solución robusta: forzar `background-color:#fff`
+    y `color:#0f172a` explícitos en la misma regla global de 30px/13px de inputs/selects/
+    textareas, sin importar dónde estén. Es seguro porque no existe en todo el proyecto un solo
+    campo de formulario con fondo oscuro intencional — todos están pensados como celda clara con
+    texto oscuro. Verificado en producción: selector de obra del Dashboard pasó de
+    `bg:#fff / color:#fff` (invisible) a `bg:#fff / color:#0f172a` (legible), sin afectar los
+    campos que ya vivían dentro de tarjetas blancas (mismo resultado que antes).
