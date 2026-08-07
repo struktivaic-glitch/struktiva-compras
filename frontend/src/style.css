@@ -81,11 +81,16 @@ table {
 
 /* Texto secundario (descripciones, etiquetas) y bordes de botones "outline" que quedan sueltos
    sobre el azul (fuera de cualquier tarjeta clara) se aclaran para dar contraste real; el mismo
-   texto/borde, cuando SÍ está dentro de una tarjeta clara, queda excluido y no cambia. */
-main :is(.text-slate-400, .text-slate-500, .text-slate-600):not(.bg-white *):not(.bg-slate-50 *):not(.bg-slate-100 *):not(.bg-slate-200 *):not(.bg-red-50 *):not(.bg-emerald-50 *):not(.bg-amber-50 *):not(.bg-sky-50 *):not(table *) {
+   texto/borde, cuando SÍ está dentro de una tarjeta clara, queda excluido y no cambia.
+   Importante: las exclusiones van prefijadas con "main " (no ".bg-slate-50" a secas) porque el
+   <body> del sistema ya trae su propia clase bg-slate-50 de fondo — sin el prefijo, *todo* el
+   contenido (al ser descendiente del body) quedaba "dentro" de esa tarjeta fantasma y la regla
+   nunca se aplicaba en ningún lado. Prefijando con "main " solo cuentan las tarjetas reales que
+   viven dentro del contenido de la página. */
+main :is(.text-slate-400, .text-slate-500, .text-slate-600):not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
   color: rgba(255, 255, 255, 0.85) !important;
 }
-main .border-slate-300:not(.bg-white *):not(.bg-slate-50 *):not(.bg-slate-100 *):not(.bg-slate-200 *):not(.bg-red-50 *):not(.bg-emerald-50 *):not(.bg-amber-50 *):not(.bg-sky-50 *):not(table *) {
+main .border-slate-300:not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
   border-color: rgba(255, 255, 255, 0.5) !important;
 }
 

@@ -678,3 +678,15 @@ cambio de estructura de base de datos.
     `#2563EB` a `#123B54` (idéntico a `primary`). La lógica de contraste (texto blanco por defecto,
     restaurado a oscuro dentro de tarjetas claras) no cambió — sigue aplicando igual de bien con
     un azul oscuro que con uno vibrante.
+  - **Bug encontrado al verificar en producción**: la regla de "aclarar texto suelto" (párrafos
+    descriptivos, botones outline) nunca se aplicaba en ningún lado del sitio. Causa: el `<body>`
+    del sistema ya trae su propia clase `bg-slate-50` de fondo (ajena a este cambio), y como es
+    ancestro de absolutamente todo, la exclusión `:not(.bg-slate-50 *)` se cumplía siempre (todo
+    es "descendiente de un bg-slate-50", el del body) — anulando la regla por completo en toda la
+    app. Corregido prefijando cada exclusión con `main ` (`:not(main .bg-slate-50 *)` en vez de
+    `:not(.bg-slate-50 *)`, y así con las demás), para que solo cuenten tarjetas reales dentro del
+    contenido de la página, no el fondo del body. Verificado con `Element.matches()` directo en
+    producción antes y después del fix: el párrafo suelto de `/reportes` pasó de no matchear nunca
+    a matchear correctamente, y una celda de tabla dentro de una tarjeta blanca en `/proveedores`
+    sigue sin matchear (se queda con su gris normal), confirmando que la exclusión ahora sí
+    distingue "suelto sobre el azul" vs "dentro de una tarjeta clara".
