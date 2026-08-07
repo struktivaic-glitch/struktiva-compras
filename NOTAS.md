@@ -690,3 +690,15 @@ cambio de estructura de base de datos.
     a matchear correctamente, y una celda de tabla dentro de una tarjeta blanca en `/proveedores`
     sigue sin matchear (se queda con su gris normal), confirmando que la exclusión ahora sí
     distingue "suelto sobre el azul" vs "dentro de una tarjeta clara".
+  - **Segundo bug encontrado por el usuario**: en los botones tipo pestaña "Materiales/Nómina" y
+    "Vista escritorio/Vista campo" de Requisición Nueva, el estado inactivo usa
+    `bg-white text-slate-500` **en el mismo elemento** (no dentro de una tarjeta, el propio botón
+    trae su fondo blanco). La exclusión anterior solo cubría "es descendiente de un `.bg-white`",
+    no "el propio elemento ya es `.bg-white`" — así que el texto se volvía blanco (regla de
+    contraste) sobre su propio fondo blanco, quedando invisible. Corregido agregando la pareja
+    `:not(.bg-white)` (auto-exclusión, sin el prefijo de ancestro) junto a cada
+    `:not(main .bg-white *)` ya existente, para las 8 clases de fondo claro. Verificado con
+    `Element.matches()` en producción: el botón "Nómina" (bg-white propio) pasó de `true` a
+    `false` en el selector (ya no se le aplica el blanco), y el párrafo suelto de `/reportes`
+    se mantiene en `true` (sigue aclarándose correctamente) — ambos casos verificados sin
+    regresión antes de desplegar.

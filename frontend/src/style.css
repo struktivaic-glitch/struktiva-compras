@@ -86,11 +86,18 @@ table {
    <body> del sistema ya trae su propia clase bg-slate-50 de fondo — sin el prefijo, *todo* el
    contenido (al ser descendiente del body) quedaba "dentro" de esa tarjeta fantasma y la regla
    nunca se aplicaba en ningún lado. Prefijando con "main " solo cuentan las tarjetas reales que
-   viven dentro del contenido de la página. */
-main :is(.text-slate-400, .text-slate-500, .text-slate-600):not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
+   viven dentro del contenido de la página.
+   Segundo bug encontrado y corregido aquí: además de excluir cuando el elemento está DENTRO de
+   una tarjeta clara (":not(main .bg-white *)"), también hay que excluirlo cuando el propio
+   elemento YA trae bg-white/bg-slate-50/etc. en su misma clase (ej. botones tipo pestaña
+   "Materiales/Nómina" en Requisición Nueva: class="bg-white text-slate-500" en el mismo
+   <button>) — la exclusión por descendiente no cubre ese caso y el texto se volvía blanco sobre
+   su propio fondo blanco, quedando invisible. Por eso cada :not() de ancestro tiene ahora su
+   pareja ":not(.bg-XXX)" a secas, para excluir también el propio elemento. */
+main :is(.text-slate-400, .text-slate-500, .text-slate-600):not(.bg-white):not(.bg-slate-50):not(.bg-slate-100):not(.bg-slate-200):not(.bg-red-50):not(.bg-emerald-50):not(.bg-amber-50):not(.bg-sky-50):not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
   color: rgba(255, 255, 255, 0.85) !important;
 }
-main .border-slate-300:not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
+main .border-slate-300:not(.bg-white):not(.bg-slate-50):not(.bg-slate-100):not(.bg-slate-200):not(.bg-red-50):not(.bg-emerald-50):not(.bg-amber-50):not(.bg-sky-50):not(main .bg-white *):not(main .bg-slate-50 *):not(main .bg-slate-100 *):not(main .bg-slate-200 *):not(main .bg-red-50 *):not(main .bg-emerald-50 *):not(main .bg-amber-50 *):not(main .bg-sky-50 *):not(main table *) {
   border-color: rgba(255, 255, 255, 0.5) !important;
 }
 
