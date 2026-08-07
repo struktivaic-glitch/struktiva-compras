@@ -45,6 +45,8 @@ const routes = [
   { path: '/avance-obra', name: 'avance-obra', component: () => import('../views/AvanceObraView.vue'), meta: { requiresAuth: true } },
   { path: '/destajistas', name: 'destajistas', component: () => import('../views/DestajistasView.vue'), meta: { requiresAuth: true } },
   { path: '/destajos', name: 'destajos', component: () => import('../views/DestajosView.vue'), meta: { requiresAuth: true } },
+  { path: '/equipos', name: 'equipos', component: () => import('../views/EquiposView.vue'), meta: { requiresAuth: true } },
+  { path: '/equipos/:id', name: 'equipo-detalle', component: () => import('../views/EquipoDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/usuarios', name: 'usuarios', component: () => import('../views/UsuariosView.vue'), meta: { requiresAuth: true, roles: ['direccion', 'auditor'] } },
   { path: '/notificaciones', name: 'notificaciones', component: () => import('../views/NotificacionesView.vue'), meta: { requiresAuth: true } },
 ];

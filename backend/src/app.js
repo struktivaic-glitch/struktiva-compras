@@ -20,6 +20,7 @@ import explosionInsumosRoutes from './modules/importaciones/explosionInsumos.js'
 import presupuestoGeneralRoutes from './modules/importaciones/presupuestoGeneral.js';
 import avanceObraRoutes from './modules/avanceObra/routes.js';
 import destajosRoutes from './modules/destajos/routes.js';
+import equiposRoutes from './modules/equipos/routes.js';
 import usuariosRoutes from './modules/usuarios/routes.js';
 import firmasRoutes from './modules/firmas/routes.js';
 import notificacionesRoutes from './modules/notificaciones/routes.js';
@@ -65,6 +66,7 @@ export async function buildApp() {
   await app.register(presupuestoGeneralRoutes);
   await app.register(avanceObraRoutes);
   await app.register(destajosRoutes);
+  await app.register(equiposRoutes);
   await app.register(usuariosRoutes);
   await app.register(firmasRoutes);
   await app.register(notificacionesRoutes);

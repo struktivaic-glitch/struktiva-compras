@@ -567,3 +567,22 @@ cambio de estructura de base de datos.
     cierre del destajo, pago bloqueado después de cerrado (409), y el concepto vuelve a quedar
     disponible para un destajo nuevo tras cancelar el anterior — datos de prueba eliminados
     después.
+- **Bloque 31** (07/08/2026): Control de Maquinaria y Equipos — tercer módulo de la lista de 4.
+  Catálogo de equipos (propio/rentado), expediente por equipo (documentos, mismo patrón BYTEA que
+  el Expediente de Personal) y bitácora de mantenimiento (preventivo/correctivo, horómetro/km,
+  costo informativo, taller, próximo mantenimiento programado). Ajuste explícito del usuario para
+  equipo **rentado**: solo se controlan fechas de vigencia de la renta + bitácora + documentación
+  — el costo de la renta **no** se registra aquí, sigue su camino normal por Requisición/
+  Cotización/OC/Factura como cualquier otro gasto, para no duplicar el control financiero.
+  - Migración 024: `equipos`, `documentos_equipo`, `bitacora_mantenimiento`.
+  - Backend: catálogo (alta/edición), expediente (subir/ver/eliminar documento, con fecha de
+    vencimiento opcional), bitácora de mantenimiento, y `GET /api/equipos/vencimientos` — panel
+    de renta/documentos/próximo mantenimiento que vencen en los próximos 30 días. Se calcula al
+    cargar la pantalla (no hay infraestructura de tareas programadas/cron en este sistema, así
+    que se optó por un panel visible en vez de notificaciones push automáticas por fecha).
+  - Frontend: `Maquinaria y Equipos` (catálogo con panel de vencimientos arriba, alta) dentro del
+    grupo Almacén, y su vista de detalle (datos editables, documentos, bitácora).
+  - Probado de punta a punta contra Neon: equipo propio y rentado, panel de vencimientos
+    detectando correctamente renta y documento próximos a vencer (dentro de 30 días) y
+    excluyendo mantenimiento programado más lejano, descarga de documento byte a byte idéntica,
+    candado de rol (403 para Almacenista) — datos de prueba eliminados después.

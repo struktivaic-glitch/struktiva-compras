@@ -96,6 +96,7 @@ const grupos = [
       { to: '/almacen/inventario', label: 'Inventario' },
       { to: '/facturas', label: 'Facturas' },
       { to: '/pagos', label: 'Pagos' },
+      { to: '/equipos', label: 'Maquinaria y Equipos' },
     ],
   },
   {
