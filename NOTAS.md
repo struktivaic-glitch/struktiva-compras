@@ -600,3 +600,17 @@ cambio de estructura de base de datos.
     panel de "por vencer" en el catálogo de Personal (mismo patrón visual que Equipos).
   - Probado contra Neon con un trabajador real existente: documento con vencimiento capturado y
     reflejado en el panel, documento de prueba eliminado después sin tocar al trabajador.
+- **Ajustes de navegación** (07/08/2026): pedidos por el usuario tras probar el sistema.
+  - Subtítulo bajo "STRUKTIVA" en el encabezado: "Control de Compras y Requisiciones · Obra" →
+    "Sistema ERP".
+  - El avatar del usuario (mismo componente `AvatarUsuario` que ya existía) ahora aparece junto
+    a la campanita de notificaciones, al mismo tamaño (54px), como link directo a "Mi perfil" —
+    se sacó de dentro de la píldora de texto para no duplicarlo.
+  - Reorganización de los menús agrupados: **Insumos** gana "Destajos" (antes en R.H.); nuevo
+    grupo **Obras** (Importar Presupuesto, Avance de Obra, "Dash de Avance de Obra" — enlaza al
+    reporte de Avance Financiero ya existente) con lo que antes vivía suelto dentro de Insumos;
+    **Almacén** se queda exactamente igual; **R.H.** pierde "Destajos" pero conserva
+    "Destajistas". De paso se agregó la categoría `avance_obra` (Bloque 29) al mapa de rutas de
+    la campanita rápida del header, que se había quedado sin registrar.
+  - Probado en el navegador: los 4 grupos muestran exactamente los ítems esperados, avatar y
+    campanita del mismo tamaño (54×54px) confirmado por medición directa del DOM.

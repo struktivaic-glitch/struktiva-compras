@@ -73,6 +73,7 @@ const RUTA_POR_CATEGORIA = {
   cancelacion: '/requisiciones',
   orden_compra: '/ordenes-compra',
   cambio_precio: '/cotizaciones',
+  avance_obra: '/avance-obra',
 };
 
 function formatoFecha(fecha) {

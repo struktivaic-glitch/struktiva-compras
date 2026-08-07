@@ -5,18 +5,21 @@
         <BrandMark :size="51" />
         <div class="mr-auto leading-tight">
           <b class="font-display text-[26px] tracking-wide">STRUKTIVA</b>
-          <div class="text-[17px] text-sky-100/80">Control de Compras y Requisiciones · Obra</div>
+          <div class="text-[17px] text-sky-100/80">Sistema ERP</div>
         </div>
         <NotificacionesBell />
-        <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full pl-1 pr-3 py-1 text-xs">
+        <RouterLink to="/perfil" title="Mi perfil">
           <AvatarUsuario
             :usuario-id="auth.usuario?.id"
             :nombre="auth.usuario?.nombre"
             :tiene-foto="auth.usuario?.tieneFoto !== false"
             :version="auth.usuario?.fotoVersion"
+            size-class="w-[54px] h-[54px] border border-white/20"
+            text-size-class="text-[20px]"
           />
+        </RouterLink>
+        <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full pl-3 pr-3 py-1 text-xs">
           <span>{{ auth.usuario?.nombre }} · {{ auth.usuario?.rolNombre }}</span>
-          <RouterLink to="/perfil" class="ml-2 underline decoration-white/40 hover:decoration-white">Perfil</RouterLink>
           <button class="ml-2 underline decoration-white/40 hover:decoration-white" @click="salir">Salir</button>
         </div>
       </div>
@@ -83,9 +86,16 @@ const grupos = [
       { to: '/proveedores', label: 'Proveedores' },
       { to: '/ordenes-compra', label: 'Órdenes de compra' },
       { to: '/importar-insumos', label: 'Importar Insumos' },
-      { to: '/importar-presupuesto-general', label: 'Importar Presupuesto General' },
-      { to: '/avance-obra', label: 'Avance de Obra' },
       { to: '/reportes', label: 'Reportes' },
+      { to: '/destajos', label: 'Destajos' },
+    ],
+  },
+  {
+    clave: 'obras', label: 'Obras', icono: '🏗️',
+    items: [
+      { to: '/importar-presupuesto-general', label: 'Importar Presupuesto' },
+      { to: '/avance-obra', label: 'Avance de Obra' },
+      { to: '/reportes/avance-financiero', label: 'Dash de Avance de Obra' },
     ],
   },
   {
@@ -107,7 +117,6 @@ const grupos = [
       { to: '/incidencias', label: 'Incidencias' },
       { to: '/pagos-personal', label: 'Pagos a Personal' },
       { to: '/destajistas', label: 'Destajistas' },
-      { to: '/destajos', label: 'Destajos' },
       { to: '/usuarios', label: 'Usuarios', roles: ['direccion', 'auditor'] },
     ],
   },
