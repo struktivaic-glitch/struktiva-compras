@@ -6,7 +6,7 @@ export default {
     extend: {
       colors: {
         primary: { DEFAULT: '#123B54', light: '#1C5478' },
-        halo: '#2563EB',
+        halo: '#123B54',
         accent: '#48B3AC',
         brand: { red: '#E2432F' },
         success: '#1E7E34',

@@ -672,3 +672,9 @@ cambio de estructura de base de datos.
     títulos legibles, tarjetas sin alterar) — se hará contra el sitio en vivo, no en local, para
     no arriesgar usar una credencial de base de datos ambigua fuera de la ya establecida para
     este proyecto.
+  - Corrección inmediata del usuario: no quería el azul vibrante sino "el azul tal cual del halo...
+    obscuro" — se reinterpretó como el azul oscuro que ya existe en el sistema (el mismo `primary`
+    del header/logo, `#123B54`), así que se cambió el valor de `halo` en `tailwind.config.js` de
+    `#2563EB` a `#123B54` (idéntico a `primary`). La lógica de contraste (texto blanco por defecto,
+    restaurado a oscuro dentro de tarjetas claras) no cambió — sigue aplicando igual de bien con
+    un azul oscuro que con uno vibrante.
