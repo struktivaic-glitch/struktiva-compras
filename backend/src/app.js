@@ -28,7 +28,7 @@ import telegramRoutes from './modules/telegram/routes.js';
 import trabajadoresRoutes from './modules/trabajadores/routes.js';
 import asistenciaRoutes from './modules/asistencia/routes.js';
 import incidenciasRoutes from './modules/incidencias/routes.js';
-import pagosPersonalRoutes from './modules/pagosPersonal/routes.js';
+import nominaRoutes from './modules/nomina/routes.js';
 import configuracionJornadaRoutes from './modules/configuracionJornada/routes.js';
 import insumosRoutes from './modules/insumos/routes.js';
 import { uploadsDir } from './lib/storage.js';
@@ -74,7 +74,7 @@ export async function buildApp() {
   await app.register(trabajadoresRoutes);
   await app.register(asistenciaRoutes);
   await app.register(incidenciasRoutes);
-  await app.register(pagosPersonalRoutes);
+  await app.register(nominaRoutes);
   await app.register(configuracionJornadaRoutes);
   await app.register(insumosRoutes);
 

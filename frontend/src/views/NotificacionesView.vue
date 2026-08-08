@@ -68,6 +68,7 @@ const CATEGORIAS = [
   { clave: 'avance_obra', label: 'Avance de obra', descripcion: 'Avances físicos que superan lo contratado, pendientes de autorización de Superintendencia/Dirección.', ruta: '/avance-obra' },
   { clave: 'cancelacion', label: 'Cancelaciones', descripcion: 'Avisos informativos de requisiciones canceladas.', ruta: '/requisiciones' },
   { clave: 'incidencia', label: 'Incidencias', descripcion: 'Faltas, permisos, vacaciones e incapacidades pendientes de autorización.', ruta: '/incidencias' },
+  { clave: 'nomina', label: 'Nómina', descripcion: 'Nóminas generadas, pendientes de marcar como pagadas.', ruta: '/pagos-personal' },
 ];
 
 const categoriaActiva = ref('requisicion');

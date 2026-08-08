@@ -150,6 +150,65 @@
           </button>
         </form>
       </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5 my-5">
+        <h3 class="text-sm font-display mb-1">Vacaciones</h3>
+        <p v-if="!form.fechaIngreso" class="text-sm text-slate-400">
+          Captura la fecha de ingreso arriba para calcular la antigüedad y los días que corresponden por ley.
+        </p>
+        <template v-else-if="vacacionesInfo">
+          <p class="text-xs text-slate-500 mb-3">
+            {{ vacacionesInfo.aniosCumplidos }} año(s) de antigüedad · según la Ley Federal del Trabajo (reforma "Vacaciones Dignas" 2023) le corresponden
+            <b class="text-slate-700">{{ vacacionesInfo.diasCorresponden }} días</b> en su año de servicio actual
+            ({{ formatoFecha(vacacionesInfo.anioServicioDesde) }} — {{ formatoFecha(vacacionesInfo.anioServicioHasta) }}).
+            Próximo aniversario: {{ formatoFecha(vacacionesInfo.proximoAniversario) }}.
+          </p>
+          <div class="grid grid-cols-3 gap-3 mb-4 max-w-sm">
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <div class="text-[10.5px] uppercase text-slate-500 font-bold">Corresponden</div>
+              <div class="font-display text-xl">{{ vacacionesInfo.diasCorresponden }}</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <div class="text-[10.5px] uppercase text-slate-500 font-bold">Tomados</div>
+              <div class="font-display text-xl">{{ vacacionesInfo.diasTomados }}</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <div class="text-[10.5px] uppercase text-slate-500 font-bold">Saldo</div>
+              <div class="font-display text-xl" :class="vacacionesInfo.diasSaldo > 0 ? 'text-success' : 'text-slate-400'">{{ vacacionesInfo.diasSaldo }}</div>
+            </div>
+          </div>
+
+          <div v-if="periodosVacaciones.length" class="divide-y divide-slate-100 mb-4">
+            <div v-for="v in periodosVacaciones" :key="v.id" class="flex items-center justify-between py-2.5 text-sm">
+              <div>
+                <span class="font-semibold">{{ formatoFecha(v.fecha_inicio) }} — {{ formatoFecha(v.fecha_fin) }}</span>
+                <span class="text-slate-400 text-xs ml-2">{{ v.dias }} día(s) · registró {{ v.registrado_por_nombre }}</span>
+                <span v-if="v.notas" class="block text-xs text-slate-500">{{ v.notas }}</span>
+              </div>
+              <button v-if="puedeEditar" class="text-xs font-semibold text-danger underline flex-none" @click="eliminarVacacion(v)">Eliminar</button>
+            </div>
+          </div>
+          <p v-else class="text-sm text-slate-400 mb-4">Sin periodos de vacaciones registrados.</p>
+
+          <form v-if="puedeEditar" class="grid sm:grid-cols-4 gap-3 items-end" @submit.prevent="registrarVacacion">
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Desde</label>
+              <input v-model="nuevaVacacion.fechaInicio" type="date" required class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Hasta</label>
+              <input v-model="nuevaVacacion.fechaFin" type="date" required class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Días</label>
+              <input v-model.number="nuevaVacacion.dias" type="number" min="0.5" step="0.5" required class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px]" />
+            </div>
+            <button type="submit" class="min-h-[42px] bg-primary text-white font-bold rounded-lg px-5 text-sm disabled:opacity-50" :disabled="guardandoVacacion">
+              {{ guardandoVacacion ? 'Guardando…' : '+ Registrar' }}
+            </button>
+          </form>
+        </template>
+      </div>
     </template>
   </AppShell>
 </template>
@@ -198,6 +257,7 @@ async function cargar() {
   persona.value = data;
   documentos.value = data.documentos;
   llenarForm(data);
+  await cargarVacaciones();
 }
 
 async function guardar() {
@@ -260,13 +320,50 @@ async function eliminarDocumento(d) {
   }
 }
 
+// --- Vacaciones ---
+const periodosVacaciones = ref([]);
+const vacacionesInfo = ref(null);
+const nuevaVacacion = reactive({ fechaInicio: '', fechaFin: '', dias: null });
+const guardandoVacacion = ref(false);
+
+async function cargarVacaciones() {
+  const { data } = await api.get(`/trabajadores/${route.params.id}/vacaciones`);
+  periodosVacaciones.value = data.periodos;
+  vacacionesInfo.value = data.info;
+}
+
+async function registrarVacacion() {
+  guardandoVacacion.value = true;
+  error.value = '';
+  try {
+    await api.post(`/trabajadores/${route.params.id}/vacaciones`, nuevaVacacion);
+    Object.assign(nuevaVacacion, { fechaInicio: '', fechaFin: '', dias: null });
+    mensaje.value = 'Periodo de vacaciones registrado.';
+    await cargarVacaciones();
+  } catch (err) {
+    error.value = err.response?.data?.error || 'No se pudo registrar el periodo.';
+  } finally {
+    guardandoVacacion.value = false;
+  }
+}
+
+async function eliminarVacacion(v) {
+  if (!window.confirm(`¿Eliminar el periodo de vacaciones del ${formatoFecha(v.fecha_inicio)}?`)) return;
+  try {
+    await api.delete(`/trabajadores/${route.params.id}/vacaciones/${v.id}`);
+    await cargarVacaciones();
+  } catch (err) {
+    error.value = err.response?.data?.error || 'No se pudo eliminar el periodo.';
+  }
+}
+
 function formatoTamano(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 function formatoFecha(fecha) {
-  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 onMounted(async () => {

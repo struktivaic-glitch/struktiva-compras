@@ -976,3 +976,91 @@ cambio de estructura de base de datos.
     "Personal asignado" en la requisición y "Pagos a Personal" (`/pagos-personal`) son
     independientes, no hay ningún vínculo entre capturar un monto aquí y que aparezca allá. Falta
     decidir si deben conectarse (y cómo) antes de dar esto por cerrado del todo.
+
+- **Bloque 36** (08/08/2026): módulo de **Nómina** completo — responde justo el pendiente que
+  quedó abierto en el Bloque 35 ("verificar que la nómina de pagos de personal donde se hace el
+  cargo"). Pedido del usuario: generar la nómina semanal o quincenal con su propio consecutivo
+  (como una requisición), detectar personal repetido de otra nómina de la misma semana, tener el
+  sueldo diario disponible, compensación opcional, la asistencia como respaldo opcional para
+  sugerir días trabajados, columna de descuentos con motivo, y registro de vacaciones + avisos de
+  antigüedad. Antes de construir se preguntaron 4 decisiones de arquitectura (ver hilo de
+  `AskUserQuestion`):
+  1. **Nómina reemplaza a Pagos a Personal** (no coexisten como dos flujos activos).
+  2. Traslape de la misma semana: **advertir y pedir justificación**, no bloquear (mismo patrón
+     que el excedente de presupuesto).
+  3. Alcance de vacaciones: **registro de periodos + cálculo de los días que corresponden por
+     ley** (no solo bitácora libre).
+  4. El toggle de "tomar asistencia en cuenta" es **por persona dentro de cada nómina** (no un
+     ajuste global).
+
+  **Nómina (generar/consultar/pagar/cancelar):**
+  - Migración `030_nomina.sql`: tablas `nominas` (folio único tipo `NOM-2026-00001` vía
+    `siguienteFolio`, periodo semanal/quincenal, fechas, estatus borrador/pagada/cancelada, forma
+    de pago del catálogo fijo del Bloque 33, quién generó/quién pagó), `nomina_detalle` (una fila
+    por persona: sueldo diario **capturado en ese momento** — no depende de que después cambie el
+    sueldo de referencia del expediente —, si usa asistencia, días trabajados, compensación +
+    concepto, descuento + motivo, total, y la justificación si hubo traslape) y
+    `vacaciones_trabajador` (periodos). Se agregó `'nomina'` al catálogo de categorías de
+    notificaciones.
+  - Backend nuevo `backend/src/modules/nomina/routes.js` — **reemplaza por completo** el módulo
+    viejo `pagosPersonal/routes.js` (borrado, no solo desregistrado). `GET /nomina/sugerencia`
+    calcula, para una persona y un rango de fechas, su sueldo diario actual, los días de
+    asistencia registrados en ese rango, y si ya aparece en otra nómina no cancelada que se
+    traslapa (mismo criterio que huecos de fechas: `fecha_inicio <= hasta AND fecha_fin >= desde`).
+    `POST /nomina` vuelve a validar los traslapes en el servidor (nunca confiar solo en lo que
+    mandó el frontend), exige justificación si hay traslape, todo en una transacción, y notifica
+    por rol Dirección. `POST /:id/marcar-pagada` (solo rol Dirección, exige forma de pago del
+    catálogo fijo) y `POST /:id/cancelar`.
+  - **El histórico de `pagos_personal` NO se tocó ni se migró** — había un registro real de
+    actividad del equipo (con foto real de una persona) capturado antes de este bloque; se dejó
+    intacto en su tabla original y se expone de solo lectura en `NominasListView.vue` bajo
+    "Historial anterior (antes de Nómina)", para no perder rastro de lo ya capturado. Todo lo
+    nuevo entra exclusivamente por `nominas`/`nomina_detalle`.
+  - Frontend: `NominasListView.vue` (lista con folio/estatus/totales + el histórico de solo
+    lectura ya mencionado), `NominaNuevaView.vue` (selector de periodo que se bloquea en cuanto
+    hay personal agregado, tarjeta por persona con sueldo/días/compensación/descuento — el
+    descuento se captura en un modal con motivo obligatorio —, bloque rojo de traslape con
+    textarea de justificación obligatoria antes de poder guardar), `NominaDetalleView.vue`
+    (desglose de solo lectura, imprimible, botón "Marcar pagada" solo para Dirección y "Cancelar
+    nómina"). Ruta `/pagos-personal` se mantiene igual (solo cambió la etiqueta del menú a
+    "Nómina") a propósito, para no tener que migrar la tabla `usuario_modulos` del Bloque 34.
+
+  **Vacaciones y aviso de antigüedad:**
+  - `backend/src/lib/antiguedad.js` (funciones puras, nada se guarda en BD): tabla de la reforma
+    "Vacaciones Dignas" (LFT Art. 76, vigente desde 2023) — año 1: 12 días, +2 por año hasta el
+    año 5 (14/16/18/20), y desde el año 6, +2 días por cada bloque de 5 años cumplidos de más (22
+    en años 6-10, 24 en 11-15…). El "año de servicio" corre de aniversario a aniversario (no es
+    el año calendario) — es el periodo contra el que se cuentan los días ya tomados.
+  - `GET/POST /trabajadores/:id/vacaciones` y `DELETE .../vacaciones/:vacId` (gestión por
+    Residente/Superintendente/Dirección; consulta abierta) — devuelve los periodos registrados
+    más el resumen (`aniosCumplidos`, `diasCorresponden`, `diasTomados`, `diasSaldo`,
+    `proximoAniversario`, rango del año de servicio vigente). Nueva tarjeta "Vacaciones" en
+    `PersonalDetalleView.vue` con el resumen, un grid de 3 estadísticas (Corresponden/Tomados/
+    Saldo), la lista de periodos con botón eliminar, y el formulario de alta.
+  - `GET /trabajadores/aniversarios` — mismo patrón que el panel de vencimientos de documentos ya
+    existente (ventana de 30 días): trae a quién le toca cumplir años de antigüedad pronto, y de
+    una vez los días de vacaciones que le van a corresponder a partir de ese aniversario. Nuevo
+    panel en `TrabajadoresView.vue`, junto al de vencimientos.
+  - **Bug real encontrado y corregido en pruebas**: el panel de aniversarios calculaba los "días
+    que corresponden" con la antigüedad **de hoy** en vez de la que la persona **va a tener al
+    cumplir el aniversario** que se está avisando — alguien que hoy tiene 5 años cumplidos y está
+    a punto de cumplir 6 aparecía con "20 días" (los del año 5) en vez de "22 días" (los que
+    realmente le tocan al entrar al año 6). Se corrigió para calcular los días con
+    `anios_cumple` (el número que ya se mostraba en el aviso), no con la antigüedad actual.
+  - **Bug menor de zona horaria corregido de paso**: `formatoFecha` en `PersonalDetalleView.vue`
+    no fijaba `timeZone: 'UTC'` (a diferencia del resto de vistas que manejan fechas tipo DATE) —
+    mostraba un día antes del real (ej. "19 ago" en vez de "20 ago"). Corregido para que coincida
+    con el patrón ya usado en `NominaDetalleView.vue`/`NominasListView.vue`.
+  - Probado de punta a punta contra Neon con un usuario Dirección y un trabajador desechables
+    (creados/eliminados por SQL directo, sin tocar ninguna cuenta ni expediente real): generar
+    sugerencia de nómina, guardar nómina, marcar pagada, cancelar; registrar un periodo de
+    vacaciones y confirmar que el saldo baja, eliminarlo y confirmar que vuelve a subir; panel de
+    aniversarios mostrando el aviso con los días corregidos (22, no 20) — todo el rastro de
+    prueba (usuario, sus módulos, su bitácora, el trabajador, sus vacaciones) eliminado después.
+  - **Pendiente explícito, dejado fuera a propósito** (palabras del usuario: "hay que dejar en
+    pendientes ver una forma grafica... algo como un calendario, ver traslapes de vacaciones
+    entre empleados... varios temas al respecto para detallar bien ese módulo"): una vista tipo
+    calendario para ver de un vistazo a quién le toca vacaciones y cuándo, y detectar traslapes de
+    vacaciones **entre distintos empleados** (lo ya construido solo evita que una misma persona
+    aparezca en dos nóminas de la misma semana — no compara las vacaciones de una persona contra
+    las de otra). Falta definir bien el alcance antes de construirlo.

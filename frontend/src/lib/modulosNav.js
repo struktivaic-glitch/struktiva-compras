@@ -42,7 +42,7 @@ export const GRUPOS_NAV = [
       { to: '/trabajadores', label: 'Personal' },
       { to: '/asistencia', label: 'Asistencia' },
       { to: '/incidencias', label: 'Incidencias' },
-      { to: '/pagos-personal', label: 'Pagos a Personal' },
+      { to: '/pagos-personal', label: 'Nómina' },
       { to: '/destajistas', label: 'Destajistas' },
     ],
   },

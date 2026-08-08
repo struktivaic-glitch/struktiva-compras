@@ -23,6 +23,17 @@
       </ul>
     </div>
 
+    <div v-if="aniversarios.length" class="bg-sky-50 border border-primary/30 rounded-xl p-4 mb-5">
+      <h3 class="text-xs font-bold uppercase text-primary mb-2">Aniversarios de antigüedad en los próximos 30 días ({{ aniversarios.length }})</h3>
+      <ul class="text-sm space-y-1">
+        <li v-for="a in aniversarios" :key="a.trabajador_id">
+          <RouterLink :to="`/trabajadores/${a.trabajador_id}`" class="text-primary underline">{{ a.nombre }}</RouterLink>
+          — cumple {{ a.anios_cumple }} año(s) el {{ formatoFecha(a.fecha) }}
+          <span class="text-slate-500">(+{{ a.dias_vacaciones_nuevos }} días de vacaciones)</span>
+        </li>
+      </ul>
+    </div>
+
     <form v-if="puedeCrear" class="bg-white border border-slate-200 rounded-xl p-4 mb-5 grid sm:grid-cols-6 gap-3 items-end" @submit.prevent="crear">
       <div class="sm:col-span-2">
         <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Nombre</label>
@@ -117,17 +128,23 @@ const puedeCrear = ['residente', 'superintendente', 'direccion'].includes(auth.r
 const puedeEditar = puedeCrear;
 const trabajadores = ref([]);
 const vencimientos = ref([]);
+const aniversarios = ref([]);
 const error = ref('');
 const guardando = ref(false);
 const incluirInactivos = ref(false);
 
 function formatoFecha(fecha) {
-  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 async function cargarVencimientos() {
   const { data } = await api.get('/trabajadores/vencimientos');
   vencimientos.value = data;
+}
+
+async function cargarAniversarios() {
+  const { data } = await api.get('/trabajadores/aniversarios');
+  aniversarios.value = data;
 }
 const form = reactive({ nombre: '', oficio: '', tipo: 'jornalero', puesto: '' });
 const editando = ref(null);
@@ -171,5 +188,6 @@ async function crear() {
 onMounted(() => {
   cargar();
   cargarVencimientos();
+  cargarAniversarios();
 });
 </script>

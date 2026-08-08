@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool.js';
 import { registrarBitacora } from '../../lib/audit.js';
+import { diasVacacionesPorAntiguedad, infoVacaciones, proximoAniversario } from '../../lib/antiguedad.js';
 
 // Catálogo de Personal (antes "trabajadores de campo", ahora también cubre administrativos) —
 // NO son usuarios del sistema ni un registro fiscal/de nómina. Sirve para:
@@ -67,6 +68,36 @@ export default async function trabajadoresRoutes(app) {
     return rows;
   });
 
+  // Próximos aniversarios de antigüedad (30 días) — mismo patrón que /vencimientos, para un
+  // panel de aviso en vez de notificaciones automáticas (no hay tareas programadas en el
+  // sistema). Trae de una vez los días de vacaciones que le van a corresponder a partir de ese
+  // aniversario, que es justo el dato útil de avisar con anticipación.
+  app.get('/api/trabajadores/aniversarios', async () => {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, fecha_ingreso FROM trabajadores WHERE activo AND fecha_ingreso IS NOT NULL ORDER BY nombre`
+    );
+    const proximos = rows
+      .map((t) => ({ ...t, proximo: proximoAniversario(t.fecha_ingreso) }))
+      .filter((t) => {
+        const diasFaltantes = (t.proximo - new Date()) / (1000 * 60 * 60 * 24);
+        return diasFaltantes <= DIAS_ALERTA_VENCIMIENTO;
+      })
+      .map((t) => {
+        const info = infoVacaciones(t.fecha_ingreso, 0);
+        const aniosCumple = info.aniosCumplidos + 1;
+        return {
+          trabajador_id: t.id,
+          nombre: t.nombre,
+          fecha: t.proximo.toISOString().slice(0, 10),
+          anios_cumple: aniosCumple,
+          // Días que corresponden a partir de ESE aniversario (no los de la antigüedad de hoy).
+          dias_vacaciones_nuevos: diasVacacionesPorAntiguedad(aniosCumple),
+        };
+      })
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    return proximos;
+  });
+
   app.get('/api/trabajadores/:id', async (request, reply) => {
     const { rows } = await pool.query(
       `SELECT t.*, o.nombre AS obra_nombre
@@ -83,6 +114,67 @@ export default async function trabajadoresRoutes(app) {
       [request.params.id]
     );
     return { ...rows[0], documentos };
+  });
+
+  // --- Vacaciones ---
+
+  app.get('/api/trabajadores/:id/vacaciones', async (request, reply) => {
+    const { rows: tRows } = await pool.query('SELECT fecha_ingreso FROM trabajadores WHERE id = $1', [request.params.id]);
+    if (!tRows[0]) return reply.code(404).send({ error: 'Personal no encontrado' });
+
+    const { rows: periodos } = await pool.query(
+      `SELECT v.id, v.fecha_inicio, v.fecha_fin, v.dias, v.notas, u.nombre AS registrado_por_nombre, v.creado_en
+       FROM vacaciones_trabajador v JOIN usuarios u ON u.id = v.registrado_por
+       WHERE v.trabajador_id = $1 ORDER BY v.fecha_inicio DESC`,
+      [request.params.id]
+    );
+
+    let info = null;
+    if (tRows[0].fecha_ingreso) {
+      const base = infoVacaciones(tRows[0].fecha_ingreso, 0);
+      const { rows: tomadosRows } = await pool.query(
+        `SELECT COALESCE(SUM(dias), 0) AS tomados FROM vacaciones_trabajador
+         WHERE trabajador_id = $1 AND fecha_inicio >= $2 AND fecha_inicio < $3`,
+        [request.params.id, base.anioServicioDesde, base.anioServicioHasta]
+      );
+      info = infoVacaciones(tRows[0].fecha_ingreso, tomadosRows[0].tomados);
+    }
+
+    return { periodos, info };
+  });
+
+  app.post('/api/trabajadores/:id/vacaciones', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { id } = request.params;
+    const { fechaInicio, fechaFin, dias, notas } = request.body ?? {};
+    if (!fechaInicio || !fechaFin || !(Number(dias) > 0)) {
+      return reply.code(400).send({ error: 'Fecha de inicio, fecha de fin y días (mayor a cero) son obligatorios' });
+    }
+    if (fechaFin < fechaInicio) return reply.code(400).send({ error: 'La fecha final no puede ser antes de la inicial' });
+
+    const { rows: existe } = await pool.query('SELECT id FROM trabajadores WHERE id = $1', [id]);
+    if (!existe[0]) return reply.code(404).send({ error: 'Personal no encontrado' });
+
+    const { rows } = await pool.query(
+      `INSERT INTO vacaciones_trabajador (trabajador_id, fecha_inicio, fecha_fin, dias, notas, registrado_por)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, fechaInicio, fechaFin, dias, notas?.trim() || null, request.user.sub]
+    );
+    await registrarBitacora(pool, {
+      tabla: 'vacaciones_trabajador', registroId: rows[0].id, usuarioId: request.user.sub, accion: 'crear', despues: rows[0],
+    });
+    return reply.code(201).send(rows[0]);
+  });
+
+  app.delete('/api/trabajadores/:id/vacaciones/:vacId', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { rowCount } = await pool.query(
+      'DELETE FROM vacaciones_trabajador WHERE id = $1 AND trabajador_id = $2',
+      [request.params.vacId, request.params.id]
+    );
+    if (!rowCount) return reply.code(404).send({ error: 'Periodo de vacaciones no encontrado' });
+    await registrarBitacora(pool, {
+      tabla: 'vacaciones_trabajador', registroId: request.params.vacId, usuarioId: request.user.sub, accion: 'eliminar',
+    });
+    return { ok: true };
   });
 
   app.post('/api/trabajadores', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {

@@ -74,6 +74,7 @@ const RUTA_POR_CATEGORIA = {
   orden_compra: '/ordenes-compra',
   cambio_precio: '/cotizaciones',
   avance_obra: '/avance-obra',
+  nomina: '/pagos-personal',
 };
 
 function formatoFecha(fecha) {
