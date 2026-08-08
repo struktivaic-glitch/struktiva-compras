@@ -928,3 +928,51 @@ cambio de estructura de base de datos.
     que ya llegaban de `/usuarios`. Probado contra Neon con un usuario Dirección de prueba
     (creado/eliminado por SQL directo, sin tocar cuentas reales): "Activos (8)" excluye
     correctamente a la cuenta demo inactiva, "Inactivos (1)" la muestra sola con el aviso.
+
+- **Bloque 35** (08/08/2026): la ventana de "Personal asignado (Mano de Obra)" dentro de una
+  requisición de tipo Materiales ahora calcula sola el total del renglón — pedido explícito del
+  usuario. Antes había que capturar cantidad y P.U. del insumo por un lado y el personal por
+  otro, y ambos debían "cuadrar" a mano (Bloque 23 original). Se le aplicó el mismo criterio que
+  ya usaba la Requisición de Nómina (Bloque 28): el personal ES el renglón, nunca hay nada que
+  capturar aparte ni que pueda dejar de cuadrar.
+  - Backend: en la rama `materiales` de `POST /requisiciones`, los insumos de la familia Mano de
+    Obra ya no reciben `cantidadRequerida`/`precioUnitario` del body — se derivan del desglose de
+    personal de ese renglón (`item.personal`, monto directo por persona): P.U. = costo unitario
+    presupuestado, cantidad = monto total del renglón ÷ ese costo unitario (misma fórmula que
+    Nómina, para poder comparar contra el saldo disponible en la unidad del insumo). El
+    `requisicion_personal` de estos renglones ahora se liga a `requisicion_detalle_id` (columna ya
+    existente desde el Bloque 28) en vez de guardarse "plano" — los datos viejos (`
+    requisicion_detalle_id IS NULL`) se siguen leyendo igual, sin migración de datos.
+  - Se eliminó por completo la validación de "cuadrar" (`PERSONAL_NO_CUADRA`) — ya no puede pasar
+    estructuralmente.
+  - Frontend (`RequisicionNuevaView.vue`): el desglose de personal ahora vive por renglón (antes
+    era una sección global al fondo, compartida entre todos los insumos de Mano de Obra de la
+    requisición) — para un insumo de esa familia, las celdas de Cant./P.U. se reemplazan por "ver
+    desglose ↓" y aparece un mini-formulario embebido (trabajador + monto + lista + **"Suma total
+    del cargo"**) que alimenta directo el "Total sugerido" de ese renglón. Igual en la vista móvil.
+  - `RequisicionDetalleView.vue`: la tabla de Materiales ahora muestra el personal asignado de
+    cada renglón inline (antes solo existía esa tabla para Nómina); la tabla "plana" vieja de
+    Personal asignado se queda como respaldo solo para requisiciones ya guardadas antes de este
+    cambio.
+  - **Bug de redondeo encontrado y corregido de paso (afectaba también a Nómina desde el
+    Bloque 28, no es nuevo)**: `cantidad_requerida` se guarda con 4 decimales; al reconstruir el
+    total como cantidad × precio, un monto de personal exacto (ej. $850.00) podía mostrarse como
+    $850.01 por el redondeo de la cantidad equivalente. Se corrigió `cargarRequisicionCompleta`
+    para que, cuando un renglón tiene personal ligado, el total se tome directo de la suma exacta
+    de `requisicion_personal.monto` en vez de reconstruirlo — corrige el despliegue tanto en
+    Materiales como en Nómina.
+  - **Bug real encontrado en pruebas (no en el syntax-check, solo se vio al probar Nómina en
+    vivo)**: al quitar la variable `montoManoDeObra` del flujo de materiales quedó una referencia
+    huérfana dentro de la rama de Nómina (`montoManoDeObra += montoRenglon`), rompiendo el guardado
+    de CUALQUIER requisición de Nómina con un 500. Detectado al probar el flujo de Nómina de punta
+    a punta después del cambio (no solo el de Materiales que era el pedido original) — recordatorio
+    de por qué se prueban ambos tipos aunque el cambio pedido solo tocara uno.
+  - Probado de punta a punta contra Neon: renglón de Materiales con 2 personas ($500+$350=$850.00
+    exacto, antes $850.01), Nómina sigue guardando bien (regresión detectada y corregida), y el
+    caso de excedente (bloqueado sin justificación, guardado con ella) — las 3 requisiciones de
+    prueba eliminadas después.
+  - **Pendiente explícito del usuario, no resuelto en este bloque**: verificar que la nómina de
+    Pagos a Personal sea donde efectivamente se hace el cargo de lo que aquí se asigna — hoy
+    "Personal asignado" en la requisición y "Pagos a Personal" (`/pagos-personal`) son
+    independientes, no hay ningún vínculo entre capturar un monto aquí y que aparezca allá. Falta
+    decidir si deben conectarse (y cómo) antes de dar esto por cerrado del todo.

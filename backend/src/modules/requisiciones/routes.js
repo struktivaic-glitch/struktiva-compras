@@ -50,7 +50,17 @@ async function cargarRequisicionCompleta(client, id) {
 
   const { rows: detalle } = await client.query(
     `SELECT rd.id, rd.insumo_id, rd.cantidad_requerida, rd.cantidad_aprobada, rd.excede_presupuesto, rd.justificacion,
-            rd.precio_unitario, (rd.cantidad_requerida * COALESCE(rd.precio_unitario, s.costo_unitario)) AS total_sugerido,
+            rd.precio_unitario,
+            -- Para renglones de Mano de Obra, cantidad_requerida es una cantidad EQUIVALENTE
+            -- derivada del monto total ÷ costo unitario (guardada con solo 4 decimales) — usar
+            -- cantidad × precio para el total redondea distinto a la suma real del personal (ej.
+            -- $850.00 de personal podía mostrarse como $850.01). Cuando el renglón tiene personal
+            -- ligado, el total se toma directo de esa suma exacta; si no, cantidad × precio como
+            -- siempre (insumos normales, sin desglose de personal).
+            COALESCE(
+              (SELECT SUM(rp.monto) FROM requisicion_personal rp WHERE rp.requisicion_detalle_id = rd.id),
+              rd.cantidad_requerida * COALESCE(rd.precio_unitario, s.costo_unitario)
+            ) AS total_sugerido,
             i.clave, i.descripcion, i.unidad, COALESCE(fi.es_mano_de_obra, false) AS es_mano_de_obra,
             s.cantidad_presupuestada, s.saldo_disponible, s.costo_unitario
      FROM requisicion_detalle rd
@@ -137,7 +147,7 @@ export default async function requisicionesRoutes(app) {
   });
 
   app.post('/api/requisiciones', async (request, reply) => {
-    const { obraId, etapaId, frenteId, partidaId, items, personal, tipo } = request.body ?? {};
+    const { obraId, etapaId, frenteId, partidaId, items, tipo } = request.body ?? {};
     const tipoReq = tipo === 'nomina' ? 'nomina' : 'materiales';
     if (!obraId || !etapaId || !frenteId || !partidaId || !Array.isArray(items) || items.length === 0) {
       return reply.code(400).send({ error: 'Obra, etapa, frente, partida y al menos un insumo son obligatorios' });
@@ -157,7 +167,6 @@ export default async function requisicionesRoutes(app) {
 
         const erroresJustificacion = [];
         const erroresPrecio = [];
-        let montoManoDeObra = 0;
         let itemsValidados;
 
         if (tipoReq === 'nomina') {
@@ -181,29 +190,54 @@ export default async function requisicionesRoutes(app) {
             if (excede && !item.justificacion?.trim()) {
               erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
             }
-            montoManoDeObra += montoRenglon;
             return { ...item, personal: personalItem, cantidadRequerida, precioUnitario: costoUnitario, excede };
           });
           if (erroresPersonal.length > 0) {
             throw Object.assign(new Error('RENGLON_SIN_PERSONAL'), { code: 400 });
           }
         } else {
+          // Renglones de Mano de Obra dentro de una requisición de materiales (Bloque 23,
+          // rediseñado 07/08/2026 a pedido del usuario): igual que en Nómina, la cantidad y el
+          // P.U. ya NO se capturan a mano — se derivan del desglose de personal asignado a ese
+          // mismo renglón (suma de montos), convertida a la unidad del insumo usando su costo
+          // presupuestado como tipo de cambio. Así el total del renglón SIEMPRE es exactamente la
+          // suma de su propio personal — nunca puede "no cuadrar" porque ya no hay dos capturas
+          // independientes que cuadrar. Los insumos que no son de Mano de Obra siguen exactamente
+          // igual que siempre (cantidad y P.U. capturados directo).
+          const erroresPersonalMdO = [];
           itemsValidados = items.map((item) => {
             const info = saldoPorInsumo.get(item.insumoId);
             const saldo = Number(info?.saldo_disponible ?? 0);
-            const excede = Number(item.cantidadRequerida) > saldo;
+            const esManoDeObra = Boolean(info?.es_mano_de_obra);
+
+            let cantidadRequerida, precioUnitario, personalItem = [];
+            if (esManoDeObra) {
+              personalItem = Array.isArray(item.personal)
+                ? item.personal.filter((p) => p.trabajadorId && Number(p.monto) > 0)
+                : [];
+              if (personalItem.length === 0) erroresPersonalMdO.push(item.insumoId);
+              const montoRenglon = personalItem.reduce((acc, p) => acc + Number(p.monto), 0);
+              const costoUnitario = Number(info?.costo_unitario ?? 0);
+              precioUnitario = costoUnitario;
+              cantidadRequerida = costoUnitario > 0 ? montoRenglon / costoUnitario : 0;
+            } else {
+              cantidadRequerida = Number(item.cantidadRequerida);
+              // El P.U. lo captura quien pide la requisición (visible desde el inicio, no un
+              // cálculo oculto contra el presupuesto) — solo caemos al costo presupuestado si no
+              // mandaron nada.
+              precioUnitario = item.precioUnitario != null && item.precioUnitario !== '' ? Number(item.precioUnitario) : Number(info?.costo_unitario ?? 0);
+            }
+
+            const excede = cantidadRequerida > saldo;
             if (excede && !item.justificacion?.trim()) {
               erroresJustificacion.push({ insumoId: item.insumoId, saldoDisponible: saldo });
             }
-            // El P.U. lo captura quien pide la requisición (visible desde el inicio, no un cálculo
-            // oculto contra el presupuesto) — solo caemos al costo presupuestado si no mandaron nada.
-            const precioUnitario = item.precioUnitario != null && item.precioUnitario !== '' ? Number(item.precioUnitario) : Number(info?.costo_unitario ?? 0);
             if (!(precioUnitario > 0)) erroresPrecio.push(item.insumoId);
-            if (info?.es_mano_de_obra) {
-              montoManoDeObra += Number(item.cantidadRequerida) * precioUnitario;
-            }
-            return { ...item, excede, precioUnitario };
+            return { ...item, excede, precioUnitario, cantidadRequerida, personal: personalItem, esManoDeObra };
           });
+          if (erroresPersonalMdO.length > 0) {
+            throw Object.assign(new Error('RENGLON_MDO_SIN_PERSONAL'), { code: 400 });
+          }
         }
 
         if (erroresPrecio.length > 0) {
@@ -214,25 +248,6 @@ export default async function requisicionesRoutes(app) {
           const err = new Error('EXCEDE_SIN_JUSTIFICACION');
           err.detalle = erroresJustificacion;
           throw err;
-        }
-
-        // Personal "plano" — solo aplica al flujo anterior (materiales con Mano de Obra
-        // mezclada, Bloque 23). Para nómina, el personal ya viene validado y anidado por renglón.
-        let personalValidado = [];
-        if (tipoReq !== 'nomina') {
-          personalValidado = Array.isArray(personal) ? personal.filter((p) => p.trabajadorId && Number(p.monto) > 0) : [];
-          if (personalValidado.length > 0) {
-            if (montoManoDeObra <= 0) {
-              throw Object.assign(new Error('PERSONAL_SIN_MANO_DE_OBRA'), { code: 422 });
-            }
-            const sumaPersonal = personalValidado.reduce((acc, p) => acc + Number(p.monto), 0);
-            if (Math.abs(sumaPersonal - montoManoDeObra) > 0.01) {
-              throw Object.assign(new Error('PERSONAL_NO_CUADRA'), {
-                code: 422,
-                detalle: { sumaPersonal, montoManoDeObra },
-              });
-            }
-          }
         }
 
         const folio = await siguienteFolio(client, 'REQ', 'requisiciones_folio_seq');
@@ -258,14 +273,18 @@ export default async function requisicionesRoutes(app) {
                 [requisicionId, detalleRows[0].id, p.trabajadorId, monto, p.diasTrabajados, p.tarifaDiaria]
               );
             }
+          } else if (item.esManoDeObra) {
+            // Mismo criterio que nómina, pero con monto directo (sin días × tarifa) — es el
+            // desglose que ya existía para Mano de Obra mezclada en una requisición de
+            // materiales, ahora ligado al renglón (requisicion_detalle_id) en vez de "plano".
+            for (const p of item.personal) {
+              await client.query(
+                `INSERT INTO requisicion_personal (requisicion_id, requisicion_detalle_id, trabajador_id, monto)
+                 VALUES ($1, $2, $3, $4)`,
+                [requisicionId, detalleRows[0].id, p.trabajadorId, p.monto]
+              );
+            }
           }
-        }
-
-        for (const p of personalValidado) {
-          await client.query(
-            `INSERT INTO requisicion_personal (requisicion_id, trabajador_id, monto) VALUES ($1, $2, $3)`,
-            [requisicionId, p.trabajadorId, p.monto]
-          );
         }
 
         await registrarBitacora(client, {
@@ -273,7 +292,7 @@ export default async function requisicionesRoutes(app) {
           registroId: requisicionId,
           usuarioId: request.user.sub,
           accion: 'crear',
-          despues: { folio, estatus: 'borrador', tipo: tipoReq, items: itemsValidados, personal: personalValidado },
+          despues: { folio, estatus: 'borrador', tipo: tipoReq, items: itemsValidados },
         });
 
         return cargarRequisicionCompleta(client, requisicionId);
@@ -293,14 +312,8 @@ export default async function requisicionesRoutes(app) {
       if (err.message === 'RENGLON_SIN_PERSONAL') {
         return reply.code(400).send({ error: 'Cada renglón de nómina necesita al menos una persona con días y tarifa capturados.' });
       }
-      if (err.message === 'PERSONAL_SIN_MANO_DE_OBRA') {
-        return reply.code(422).send({ error: 'Agrega un insumo de la familia Mano de Obra antes de asignar personal.' });
-      }
-      if (err.message === 'PERSONAL_NO_CUADRA') {
-        return reply.code(422).send({
-          error: `La suma del personal asignado (${err.detalle.sumaPersonal.toFixed(2)}) no coincide con el total de Mano de Obra de la requisición (${err.detalle.montoManoDeObra.toFixed(2)}).`,
-          detalle: err.detalle,
-        });
+      if (err.message === 'RENGLON_MDO_SIN_PERSONAL') {
+        return reply.code(400).send({ error: 'Cada renglón de Mano de Obra necesita al menos una persona con un monto asignado.' });
       }
       request.log.error(err);
       return reply.code(500).send({ error: 'No se pudo crear la requisición' });

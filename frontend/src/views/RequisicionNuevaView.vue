@@ -181,10 +181,12 @@
               <td class="px-4 py-2.5">{{ item.cantidadPresupuestada }}</td>
               <td class="px-4 py-2.5">{{ item.saldoDisponible }}</td>
               <td class="px-4 py-2.5">
-                <input v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
+                <input v-if="!item.esManoDeObra" v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
+                <span v-else class="text-slate-400 text-xs">ver desglose ↓</span>
               </td>
               <td class="px-4 py-2.5">
-                <input v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
+                <input v-if="!item.esManoDeObra" v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="w-24 border border-slate-300 rounded px-2 py-1.5" />
+                <span v-else class="text-slate-400 text-xs">ver desglose ↓</span>
               </td>
               <td class="px-4 py-2.5 font-semibold">{{ mxn(totalSugerido(item)) }}</td>
               <td class="px-4 py-2.5 font-sans">
@@ -193,10 +195,47 @@
               </td>
               <td class="px-4 py-2.5 font-sans"><button class="text-slate-400 hover:text-danger" @click="quitarInsumo(item)">✕</button></td>
             </tr>
+
+            <!-- Renglón de Mano de Obra: la cantidad y el P.U. de arriba se derivan de este
+                 desglose — la suma total del cargo alimenta automáticamente el renglón del
+                 insumo (pedido del usuario 07/08/2026), nunca se captura aparte. -->
+            <tr v-if="item.esManoDeObra" class="border-t border-slate-100 bg-slate-50/60">
+              <td colspan="10" class="px-4 py-3">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Personal asignado — {{ item.descripcion }}</p>
+                <div v-if="item.personal.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 mb-2 bg-white max-w-md">
+                  <div v-for="(p, pidx) in item.personal" :key="pidx" class="flex items-center justify-between px-3 py-2 text-sm">
+                    <span>{{ nombreTrabajador(p.trabajadorId) }}</span>
+                    <div class="flex items-center gap-3">
+                      <span class="tabular-nums font-semibold">{{ mxn(p.monto) }}</span>
+                      <button class="text-slate-400 hover:text-danger" @click="item.personal.splice(pidx, 1)">✕</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-end gap-2">
+                  <div class="flex-1 min-w-[160px] max-w-xs">
+                    <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Trabajador</label>
+                    <select v-model.number="item.nuevoPersonal.trabajadorId" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm">
+                      <option :value="null" disabled>Elegir…</option>
+                      <option v-for="t in trabajadores" :key="t.id" :value="t.id">{{ t.nombre }}{{ t.oficio ? ' · ' + t.oficio : '' }}</option>
+                    </select>
+                  </div>
+                  <div class="w-32">
+                    <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Monto</label>
+                    <input v-model.number="item.nuevoPersonal.monto" type="number" inputmode="decimal" min="0" step="any" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" />
+                  </div>
+                  <button type="button" class="min-h-[42px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm" :disabled="!item.nuevoPersonal.trabajadorId || !item.nuevoPersonal.monto" @click="agregarPersonalItem(item)">
+                    + Agregar
+                  </button>
+                  <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="renglonAltaTrabajador = item; mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
+                </div>
+                <p class="text-sm font-bold mt-2">Suma total del cargo: {{ mxn(totalPersonalItem(item)) }}</p>
+              </td>
+            </tr>
+
             <tr v-if="excede(item)" class="border-t border-danger/20">
               <td colspan="10" class="px-4 py-3 bg-red-50">
                 <label class="block text-[11.5px] font-bold text-danger mb-1">
-                  Justificación técnica obligatoria — {{ item.descripcion }} excede saldo disponible por {{ (item.cantidadRequerida - item.saldoDisponible).toFixed(2) }} {{ item.unidad }}
+                  Justificación técnica obligatoria — {{ item.descripcion }} excede saldo disponible por {{ (cantidadEquivalente(item) - item.saldoDisponible).toFixed(2) }} {{ item.unidad }}
                 </label>
                 <textarea v-model="item.justificacion" rows="2" class="w-full border border-danger rounded-md px-2.5 py-1.5 text-sm" placeholder="Describe el motivo del excedente…" />
               </td>
@@ -217,14 +256,45 @@
         <div class="text-[11px] text-slate-500 mb-2">{{ item.clave }} · {{ item.unidad }}</div>
         <div class="flex justify-between text-[12.5px] text-slate-500 py-0.5"><span>Presupuestado</span><b class="text-slate-800">{{ item.cantidadPresupuestada }} {{ item.unidad }}</b></div>
         <div class="flex justify-between text-[12.5px] text-slate-500 py-0.5"><span>Disponible</span><b class="text-slate-800">{{ item.saldoDisponible }} {{ item.unidad }}</b></div>
-        <div class="flex items-center gap-2.5 mt-2.5">
-          <label class="text-xs text-slate-500 flex-none">Cant.</label>
-          <input v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
+        <template v-if="!item.esManoDeObra">
+          <div class="flex items-center gap-2.5 mt-2.5">
+            <label class="text-xs text-slate-500 flex-none">Cant.</label>
+            <input v-model.number="item.cantidadRequerida" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
+          </div>
+          <div class="flex items-center gap-2.5 mt-2.5">
+            <label class="text-xs text-slate-500 flex-none">P.U.</label>
+            <input v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
+          </div>
+        </template>
+
+        <!-- Renglón de Mano de Obra: cantidad y P.U. se derivan del desglose de personal — la
+             suma total del cargo alimenta automáticamente el renglón (pedido del usuario
+             07/08/2026), nunca se captura aparte. -->
+        <div v-else class="mt-2.5 bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Personal asignado</p>
+          <div v-if="item.personal.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 mb-2 bg-white">
+            <div v-for="(p, pidx) in item.personal" :key="pidx" class="flex items-center justify-between px-3 py-2 text-sm">
+              <span>{{ nombreTrabajador(p.trabajadorId) }}</span>
+              <div class="flex items-center gap-3">
+                <span class="tabular-nums font-semibold">{{ mxn(p.monto) }}</span>
+                <button class="text-slate-400 hover:text-danger" @click="item.personal.splice(pidx, 1)">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5 mb-2">
+            <select v-model.number="item.nuevoPersonal.trabajadorId" class="flex-1 min-h-[44px] border border-slate-300 rounded-lg text-sm">
+              <option :value="null" disabled>Trabajador…</option>
+              <option v-for="t in trabajadores" :key="t.id" :value="t.id">{{ t.nombre }}{{ t.oficio ? ' · ' + t.oficio : '' }}</option>
+            </select>
+            <input v-model.number="item.nuevoPersonal.monto" type="number" inputmode="decimal" min="0" step="any" placeholder="Monto" class="w-24 min-h-[44px] text-center border border-slate-300 rounded-lg" />
+          </div>
+          <button type="button" class="min-h-[44px] w-full border-[1.5px] border-primary text-primary font-bold rounded-lg text-sm mb-1" :disabled="!item.nuevoPersonal.trabajadorId || !item.nuevoPersonal.monto" @click="agregarPersonalItem(item)">
+            + Agregar
+          </button>
+          <button type="button" class="text-xs text-slate-400 underline" @click="renglonAltaTrabajador = item; mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
+          <p class="text-sm font-bold mt-2">Suma total del cargo: {{ mxn(totalPersonalItem(item)) }}</p>
         </div>
-        <div class="flex items-center gap-2.5 mt-2.5">
-          <label class="text-xs text-slate-500 flex-none">P.U.</label>
-          <input v-model.number="item.precioUnitario" type="number" inputmode="decimal" min="0" step="any" class="flex-1 min-h-[48px] text-lg text-center border border-slate-300 rounded-lg" />
-        </div>
+
         <div class="flex justify-between text-[12.5px] text-slate-500 py-0.5 mt-2"><span>Total sugerido</span><b class="text-slate-800">{{ mxn(totalSugerido(item)) }}</b></div>
         <div v-if="excede(item)" class="mt-2.5 bg-red-50 border border-dashed border-danger rounded-md px-2.5 py-2">
           <label class="text-[11px] font-bold text-danger block mb-1">Justificación técnica obligatoria</label>
@@ -235,48 +305,6 @@
     </div>
 
     <p v-else-if="obraId" class="text-sm text-slate-400 mb-3">Agrega insumos con el buscador de arriba.</p>
-
-    <!-- Desglose de personal — solo aparece si hay algún insumo de la familia Mano de Obra -->
-    <div v-if="montoManoDeObra > 0" class="bg-white border border-slate-200 rounded-xl p-4 mb-3">
-      <h3 class="text-sm font-display mb-1">Personal asignado (Mano de Obra)</h3>
-      <p class="text-xs text-slate-500 mb-3">
-        Desglosa a quién se le paga qué de esta requisición — solo para control interno del gasto, no es un recibo de nómina.
-        La suma debe coincidir con el total de Mano de Obra: <b class="text-slate-700">{{ mxn(montoManoDeObra) }}</b>.
-      </p>
-
-      <div v-if="personal.length" class="border border-slate-200 rounded-lg divide-y divide-slate-100 mb-3">
-        <div v-for="(p, idx) in personal" :key="idx" class="flex items-center justify-between px-3 py-2 text-sm">
-          <span>{{ nombreTrabajador(p.trabajadorId) }}</span>
-          <div class="flex items-center gap-3">
-            <span class="tabular-nums font-semibold">{{ mxn(p.monto) }}</span>
-            <button class="text-slate-400 hover:text-danger" @click="personal.splice(idx, 1)">✕</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-2 mb-2">
-        <div class="flex-1 min-w-[160px]">
-          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Trabajador</label>
-          <select v-model.number="nuevoPersonal.trabajadorId" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm">
-            <option :value="null" disabled>Elegir…</option>
-            <option v-for="t in trabajadoresDisponibles" :key="t.id" :value="t.id">{{ t.nombre }}{{ t.oficio ? ' · ' + t.oficio : '' }}</option>
-          </select>
-        </div>
-        <div class="w-32">
-          <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Monto</label>
-          <input v-model.number="nuevoPersonal.monto" type="number" inputmode="decimal" min="0" step="any" class="w-full border border-slate-300 rounded-lg px-2.5 min-h-[42px] text-sm" />
-        </div>
-        <button type="button" class="min-h-[42px] border-[1.5px] border-primary text-primary font-bold rounded-lg px-4 text-sm" :disabled="!nuevoPersonal.trabajadorId || !nuevoPersonal.monto" @click="agregarPersonal">
-          + Agregar
-        </button>
-        <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
-      </div>
-
-      <p class="text-xs font-semibold" :class="personalCuadra ? 'text-success' : 'text-danger'">
-        Asignado: {{ mxn(sumaPersonal) }} de {{ mxn(montoManoDeObra) }}
-        <span v-if="!personalCuadra && personal.length"> — no cuadra, faltan {{ mxn(montoManoDeObra - sumaPersonal) }}</span>
-      </p>
-    </div>
     </template>
 
     <!-- ===== Requisición de Nómina (Bloque 28) ===== -->
@@ -334,7 +362,7 @@
           >
             + Agregar
           </button>
-          <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
+          <button type="button" class="text-xs text-slate-400 underline ml-auto" @click="renglonAltaTrabajador = renglon; mostrarAltaTrabajador = true">¿No está en la lista? Dar de alta</button>
         </div>
 
         <p class="text-sm font-bold mt-2">Total del renglón: {{ mxn(totalRenglon(renglon)) }}</p>
@@ -482,6 +510,7 @@ const familiasFiltradas = computed(() => {
 });
 
 function excede(item) {
+  if (item.esManoDeObra) return cantidadEquivalente(item) > Number(item.saldoDisponible);
   return Number(item.cantidadRequerida) > Number(item.saldoDisponible);
 }
 
@@ -495,7 +524,6 @@ watch(obraId, () => {
   etapaId.value = etapas.value[0]?.id ?? null;
   items.value = [];
   catalogoInsumos.value = [];
-  personal.value = [];
   renglonesNomina.value = [];
   insumosManoDeObra.value = [];
 });
@@ -526,6 +554,7 @@ async function abrirCatalogo() {
 }
 
 function agregarInsumo(s) {
+  const esManoDeObra = Boolean(s.es_mano_de_obra);
   items.value.push({
     insumoId: s.id,
     clave: s.clave,
@@ -536,10 +565,15 @@ function agregarInsumo(s) {
     costoUnitario: Number(s.costo_unitario ?? 0),
     // El P.U. se precarga con el del presupuesto (referencia útil) pero es editable — el total
     // sugerido de esta requisición se calcula con el P.U. que quede aquí, no el del presupuesto.
-    precioUnitario: Number(s.costo_unitario ?? 0) || null,
-    esManoDeObra: Boolean(s.es_mano_de_obra),
-    cantidadRequerida: null,
+    // Para Mano de Obra no aplica: cantidad y P.U. se derivan solas del desglose de personal de
+    // abajo (mismo criterio que la Requisición de Nómina — nunca se captura a mano, así el total
+    // del renglón siempre es exactamente la suma de su propio personal).
+    precioUnitario: esManoDeObra ? null : Number(s.costo_unitario ?? 0) || null,
+    esManoDeObra,
+    cantidadRequerida: esManoDeObra ? null : null,
     justificacion: '',
+    personal: esManoDeObra ? [] : undefined,
+    nuevoPersonal: esManoDeObra ? { trabajadorId: null, monto: null } : undefined,
   });
   busqueda.value = '';
   sugerencias.value = [];
@@ -549,14 +583,40 @@ function quitarInsumo(item) {
   items.value = items.value.filter((i) => i.insumoId !== item.insumoId);
 }
 
+// Suma total del cargo — pedido explícito del usuario (07/08/2026): esto es lo que alimenta
+// automáticamente el renglón del insumo de Mano de Obra, en vez de capturar cantidad/P.U. aparte
+// y tener que cuadrarlos a mano contra el personal asignado.
+function totalPersonalItem(item) {
+  return (item.personal || []).reduce((acc, p) => acc + Number(p.monto || 0), 0);
+}
+
 function totalSugerido(item) {
+  if (item.esManoDeObra) return totalPersonalItem(item);
   return Number(item.cantidadRequerida || 0) * Number(item.precioUnitario || 0);
 }
 
-// --- Personal asignado (Mano de Obra) ---
+// Cantidad equivalente en la unidad del insumo (ej. "Jornal"), para poder comparar el cargo de
+// Mano de Obra contra el saldo disponible presupuestado — mismo cálculo que ya usa el backend y
+// la Requisición de Nómina: monto total ÷ costo unitario presupuestado.
+function cantidadEquivalente(item) {
+  if (!item.esManoDeObra) return Number(item.cantidadRequerida || 0);
+  return item.costoUnitario > 0 ? totalPersonalItem(item) / item.costoUnitario : 0;
+}
+
+function agregarPersonalItem(item) {
+  item.personal.push({ ...item.nuevoPersonal });
+  item.nuevoPersonal = { trabajadorId: null, monto: null };
+}
+
+// Qué renglón está recibiendo el alta rápida de trabajador ("¿No está en la lista?") — para
+// saber a cuál de los desgloses de personal agregar al recién creado.
+const renglonAltaTrabajador = ref(null);
+
+// --- Personal asignado (Mano de Obra) — desglosado por renglón, ver agregarPersonalItem arriba.
+// Rediseñado 07/08/2026 a pedido del usuario: antes cantidad/P.U. se capturaban aparte y debían
+// "cuadrar" a mano contra la suma del personal; ahora el personal ES el renglón — no hay nada
+// que capturar aparte ni que pueda dejar de cuadrar. ---
 const trabajadores = ref([]);
-const personal = ref([]);
-const nuevoPersonal = reactive({ trabajadorId: null, monto: null });
 const mostrarAltaTrabajador = ref(false);
 const altaTrabajador = reactive({ nombre: '', oficio: '' });
 const errorAltaTrabajador = ref('');
@@ -568,7 +628,9 @@ async function darDeAltaTrabajador() {
   try {
     const { data } = await api.post('/trabajadores', altaTrabajador);
     trabajadores.value.push(data);
-    nuevoPersonal.trabajadorId = data.id;
+    // Selecciona al recién creado en el renglón (materiales-MdO o nómina) desde donde se abrió
+    // el alta rápida — ver renglonAltaTrabajador.
+    if (renglonAltaTrabajador.value) renglonAltaTrabajador.value.nuevoPersonal.trabajadorId = data.id;
     altaTrabajador.nombre = '';
     altaTrabajador.oficio = '';
     mostrarAltaTrabajador.value = false;
@@ -579,26 +641,11 @@ async function darDeAltaTrabajador() {
   }
 }
 
-// El objetivo a cuadrar con Personal asignado usa el P.U. capturado en ESTA requisición, no el
-// costo del presupuesto — así no se mezclan jornales con un monto calculado aparte y a ciegas.
-const montoManoDeObra = computed(() =>
-  items.value.filter((i) => i.esManoDeObra).reduce((acc, i) => acc + totalSugerido(i), 0)
-);
-const sumaPersonal = computed(() => personal.value.reduce((acc, p) => acc + Number(p.monto || 0), 0));
-const personalCuadra = computed(() => Math.abs(sumaPersonal.value - montoManoDeObra.value) < 0.01);
-const personalListoParaGuardar = computed(() => montoManoDeObra.value <= 0 || personal.value.length === 0 || personalCuadra.value);
-const trabajadoresDisponibles = computed(() => trabajadores.value.filter((t) => !personal.value.some((p) => p.trabajadorId === t.id)));
-
 function mxn(n) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 }
 function nombreTrabajador(id) {
   return trabajadores.value.find((t) => t.id === id)?.nombre ?? '—';
-}
-function agregarPersonal() {
-  personal.value.push({ trabajadorId: nuevoPersonal.trabajadorId, monto: nuevoPersonal.monto });
-  nuevoPersonal.trabajadorId = null;
-  nuevoPersonal.monto = null;
 }
 
 // --- Requisición de Nómina (Bloque 28) ---
@@ -695,9 +742,9 @@ async function darDeAltaInsumo() {
 
 const puedeGuardar = computed(() => {
   if (tipoRequisicion.value === 'nomina') {
-    return renglonesNomina.value.length > 0 && renglonesNomina.value.every((r) => r.personal.length > 0) && personalListoParaGuardar.value;
+    return renglonesNomina.value.length > 0 && renglonesNomina.value.every((r) => r.personal.length > 0);
   }
-  return items.value.length > 0 && personalListoParaGuardar.value;
+  return items.value.length > 0 && items.value.every((i) => !i.esManoDeObra || i.personal.length > 0);
 });
 
 async function guardar(siguiente) {
@@ -732,16 +779,16 @@ async function guardar(siguiente) {
       errorGeneral.value = `Falta justificación técnica en: ${faltantes.map((i) => i.descripcion).join(', ')}`;
       return;
     }
-    if (items.value.some((i) => !i.cantidadRequerida || i.cantidadRequerida <= 0)) {
+    if (items.value.some((i) => !i.esManoDeObra && (!i.cantidadRequerida || i.cantidadRequerida <= 0))) {
       errorGeneral.value = 'Captura una cantidad requerida mayor a cero en cada insumo.';
       return;
     }
-    if (items.value.some((i) => !i.precioUnitario || i.precioUnitario <= 0)) {
+    if (items.value.some((i) => !i.esManoDeObra && (!i.precioUnitario || i.precioUnitario <= 0))) {
       errorGeneral.value = 'Captura un precio unitario mayor a cero en cada insumo.';
       return;
     }
-    if (montoManoDeObra.value > 0 && personal.value.length > 0 && !personalCuadra.value) {
-      errorGeneral.value = `El personal asignado (${mxn(sumaPersonal.value)}) no coincide con el total de Mano de Obra (${mxn(montoManoDeObra.value)}).`;
+    if (items.value.some((i) => i.esManoDeObra && i.personal.length === 0)) {
+      errorGeneral.value = 'Cada renglón de Mano de Obra necesita al menos una persona con un monto asignado.';
       return;
     }
     payload = {
@@ -752,11 +799,11 @@ async function guardar(siguiente) {
       partidaId: partidaId.value,
       items: items.value.map((i) => ({
         insumoId: i.insumoId,
-        cantidadRequerida: i.cantidadRequerida,
-        precioUnitario: i.precioUnitario,
+        cantidadRequerida: i.esManoDeObra ? undefined : i.cantidadRequerida,
+        precioUnitario: i.esManoDeObra ? undefined : i.precioUnitario,
         justificacion: i.justificacion || null,
+        personal: i.esManoDeObra ? i.personal.map((p) => ({ trabajadorId: p.trabajadorId, monto: p.monto })) : undefined,
       })),
-      personal: personal.value,
     };
   }
 

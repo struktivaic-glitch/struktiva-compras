@@ -74,6 +74,14 @@
                   <span v-else class="text-[11px] text-slate-400">Normal</span>
                 </td>
               </tr>
+              <tr v-if="d.personal?.length" class="border-t border-slate-100 bg-slate-50/60">
+                <td colspan="7" class="px-4 py-2.5">
+                  <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1 font-sans">Personal asignado</p>
+                  <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs font-sans">
+                    <span v-for="p in d.personal" :key="p.id">{{ p.nombre }}<template v-if="p.oficio"> ({{ p.oficio }})</template>: <b>{{ mxn(p.monto) }}</b></span>
+                  </div>
+                </td>
+              </tr>
               <tr v-if="d.excede_presupuesto && d.justificacion" class="border-t border-slate-100 bg-red-50/40">
                 <td colspan="7" class="px-4 py-2 text-xs text-slate-600 font-sans"><b>Justificación:</b> {{ d.justificacion }}</td>
               </tr>
