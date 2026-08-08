@@ -8,9 +8,14 @@
           Obra en las requisiciones y para el expediente de cada persona. No es nómina ni un registro fiscal.
         </p>
       </div>
-      <label v-if="puedeEditar" class="flex items-center gap-1.5 text-xs text-slate-500 flex-none">
-        <input type="checkbox" v-model="incluirInactivos" @change="cargar" class="w-4 h-4" /> Mostrar inactivos
-      </label>
+      <div class="flex items-center gap-3 flex-none">
+        <RouterLink to="/trabajadores/vacaciones-calendario" class="min-h-[39px] flex items-center border-[1.5px] border-primary text-primary text-[13px] font-bold rounded-lg px-4">
+          Calendario de vacaciones
+        </RouterLink>
+        <label v-if="puedeEditar" class="flex items-center gap-1.5 text-xs text-slate-500">
+          <input type="checkbox" v-model="incluirInactivos" @change="cargar" class="w-4 h-4" /> Mostrar inactivos
+        </label>
+      </div>
     </div>
 
     <div v-if="vencimientos.length" class="bg-amber-50 border border-warning/30 rounded-xl p-4 mb-5">

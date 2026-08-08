@@ -10,6 +10,7 @@ const routes = [
   { path: '/requisiciones/:id', name: 'requisicion-detalle', component: () => import('../views/RequisicionDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/proveedores', name: 'proveedores', component: () => import('../views/ProveedoresView.vue'), meta: { requiresAuth: true } },
   { path: '/trabajadores', name: 'trabajadores', component: () => import('../views/TrabajadoresView.vue'), meta: { requiresAuth: true } },
+  { path: '/trabajadores/vacaciones-calendario', name: 'vacaciones-calendario', component: () => import('../views/VacacionesCalendarioView.vue'), meta: { requiresAuth: true } },
   { path: '/trabajadores/:id', name: 'personal-detalle', component: () => import('../views/PersonalDetalleView.vue'), meta: { requiresAuth: true } },
   { path: '/asistencia', name: 'asistencia', component: () => import('../views/AsistenciaView.vue'), meta: { requiresAuth: true } },
   { path: '/incidencias', name: 'incidencias', component: () => import('../views/IncidenciasView.vue'), meta: { requiresAuth: true } },

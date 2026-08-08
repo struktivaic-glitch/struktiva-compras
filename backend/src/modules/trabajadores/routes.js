@@ -98,6 +98,34 @@ export default async function trabajadoresRoutes(app) {
     return proximos;
   });
 
+  // Calendario de vacaciones (línea de tiempo) — trae los periodos de todo el personal activo
+  // que caen dentro del rango pedido, para poder verlos agrupados por oficio y detectar
+  // traslapes entre personas distintas (a diferencia del traslape de Nómina, que solo cuida que
+  // una misma persona no quede en dos nóminas). El cálculo de "quién se traslapa con quién" se
+  // hace en el frontend (agrupando por oficio), aquí solo se entrega el dato crudo.
+  app.get('/api/trabajadores/vacaciones-calendario', async (request, reply) => {
+    const { desde, hasta, obraId } = request.query ?? {};
+    if (!desde || !hasta) return reply.code(400).send({ error: 'Falta el rango de fechas (desde/hasta)' });
+
+    const params = [desde, hasta];
+    let filtroObra = '';
+    if (obraId) {
+      params.push(obraId);
+      filtroObra = `AND t.obra_id = $${params.length}`;
+    }
+    const { rows } = await pool.query(
+      `SELECT v.id, v.fecha_inicio, v.fecha_fin, v.dias,
+              t.id AS trabajador_id, t.nombre AS trabajador_nombre, t.oficio, t.obra_id, o.nombre AS obra_nombre
+       FROM vacaciones_trabajador v
+       JOIN trabajadores t ON t.id = v.trabajador_id
+       LEFT JOIN obras o ON o.id = t.obra_id
+       WHERE t.activo AND v.fecha_inicio <= $2 AND v.fecha_fin >= $1 ${filtroObra}
+       ORDER BY t.oficio NULLS LAST, t.nombre, v.fecha_inicio`,
+      params
+    );
+    return rows;
+  });
+
   app.get('/api/trabajadores/:id', async (request, reply) => {
     const { rows } = await pool.query(
       `SELECT t.*, o.nombre AS obra_nombre
@@ -163,6 +191,31 @@ export default async function trabajadoresRoutes(app) {
       tabla: 'vacaciones_trabajador', registroId: rows[0].id, usuarioId: request.user.sub, accion: 'crear', despues: rows[0],
     });
     return reply.code(201).send(rows[0]);
+  });
+
+  // Editar las fechas de un periodo ya registrado — pensado para el calendario de vacaciones:
+  // la barra muestra la fecha "sugerida" y, una vez consultada la disponibilidad real con la
+  // persona, se ajusta aquí mismo en vez de borrar y volver a capturar.
+  app.put('/api/trabajadores/:id/vacaciones/:vacId', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {
+    const { id, vacId } = request.params;
+    const { fechaInicio, fechaFin, dias, notas } = request.body ?? {};
+    if (!fechaInicio || !fechaFin || !(Number(dias) > 0)) {
+      return reply.code(400).send({ error: 'Fecha de inicio, fecha de fin y días (mayor a cero) son obligatorios' });
+    }
+    if (fechaFin < fechaInicio) return reply.code(400).send({ error: 'La fecha final no puede ser antes de la inicial' });
+
+    const { rows } = await pool.query(
+      `UPDATE vacaciones_trabajador SET fecha_inicio = $3, fecha_fin = $4, dias = $5, notas = $6
+       WHERE id = $1 AND trabajador_id = $2
+       RETURNING *`,
+      [vacId, id, fechaInicio, fechaFin, dias, notas?.trim() || null]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Periodo de vacaciones no encontrado' });
+
+    await registrarBitacora(pool, {
+      tabla: 'vacaciones_trabajador', registroId: vacId, usuarioId: request.user.sub, accion: 'editar', despues: rows[0],
+    });
+    return rows[0];
   });
 
   app.delete('/api/trabajadores/:id/vacaciones/:vacId', { preHandler: app.requireRole(...ROLES_GESTION) }, async (request, reply) => {

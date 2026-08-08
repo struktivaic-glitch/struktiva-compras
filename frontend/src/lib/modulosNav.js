@@ -40,6 +40,7 @@ export const GRUPOS_NAV = [
     clave: 'rh', label: 'R.H.', icono: '👥',
     items: [
       { to: '/trabajadores', label: 'Personal' },
+      { to: '/trabajadores/vacaciones-calendario', label: 'Calendario de vacaciones' },
       { to: '/asistencia', label: 'Asistencia' },
       { to: '/incidencias', label: 'Incidencias' },
       { to: '/pagos-personal', label: 'Nómina' },

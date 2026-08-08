@@ -1063,4 +1063,38 @@ cambio de estructura de base de datos.
     calendario para ver de un vistazo a quién le toca vacaciones y cuándo, y detectar traslapes de
     vacaciones **entre distintos empleados** (lo ya construido solo evita que una misma persona
     aparezca en dos nóminas de la misma semana — no compara las vacaciones de una persona contra
-    las de otra). Falta definir bien el alcance antes de construirlo.
+    las de otra). Falta definir bien el alcance antes de construirlo. **Resuelto en el Bloque 37.**
+
+- **Bloque 37** (08/08/2026): calendario de vacaciones — resuelve el pendiente que se dejó
+  explícitamente abierto en el Bloque 36. Antes de construir se le mostró al usuario una
+  maqueta comparando un calendario de mes (casillas por día) contra una línea de tiempo tipo
+  Gantt agrupada por oficio, con la recomendación de la segunda (el problema real no es "¿hay
+  alguien de vacaciones hoy?" sino "¿me quedo sin fierreros esa semana?", algo que una cuadrícula
+  de días no muestra bien) — el usuario la aprobó con un ajuste: que el traslape se marque
+  **rellenando la barra de rojo** (no solo un borde), y pidió poder ajustar las fechas de un
+  periodo directo desde la barra, dejando la fecha "sugerida" original como punto de partida.
+  - Backend (`trabajadores/routes.js`): `GET /trabajadores/vacaciones-calendario?desde=&hasta=
+    &obraId=` — trae los periodos de vacaciones de todo el personal activo que caen en el rango,
+    con oficio y obra ya incluidos; el cálculo de quién se traslapa con quién se hace en el
+    frontend (agrupando por oficio), el backend solo entrega el dato crudo. `PUT
+    /trabajadores/:id/vacaciones/:vacId` — nuevo, para editar las fechas de un periodo ya
+    registrado (antes solo existía crear/eliminar) — pensado justo para ajustar la fecha
+    "sugerida" una vez confirmada la disponibilidad real con la persona, sin tener que borrar y
+    volver a capturar.
+  - Frontend: `VacacionesCalendarioView.vue` (nueva, ruta `/trabajadores/vacaciones-calendario`,
+    enlazada desde `TrabajadoresView.vue` y agregada al menú R.H.) — filtros de obra y rango
+    (próximas 8 semanas / este mes / próximos 3 meses), línea de tiempo agrupada por oficio con
+    una fila por persona, línea punteada de "hoy", y barras: azul normal, **rojo sólido cuando se
+    traslapa con otra persona distinta del mismo oficio** (el traslape de una misma persona en
+    dos nóminas de la misma semana ya se cuida aparte, en el módulo de Nómina del Bloque 36 — este
+    es un traslape distinto: entre personas). Clic en una barra abre un modal con las fechas
+    editables (prellenadas con lo ya registrado) y días, con botón de guardar o eliminar. Debajo
+    de la línea de tiempo, un resumen en texto de cada traslape detectado ("Fulano y Zutano
+    (oficio) se traslapan del … al …").
+  - Probado de punta a punta contra Neon con un usuario Dirección y tres trabajadores desechables
+    (dos del mismo oficio de prueba con periodos que se cruzan, uno de otro oficio sin cruce):
+    confirmado que ambas barras del oficio cruzado salen en rojo sólido (no solo borde), que el
+    resumen de traslape calcula bien la intersección de fechas, que editar una fecha desde la
+    barra hasta que deja de cruzarse hace que el aviso de traslape desaparezca solo, y que
+    eliminar desde el mismo modal quita la barra — todo el rastro de prueba (usuario, sus
+    módulos, su bitácora, los tres trabajadores y sus vacaciones) eliminado después.
